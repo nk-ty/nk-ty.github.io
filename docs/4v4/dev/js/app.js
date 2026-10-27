@@ -5,17 +5,21 @@ import * as settingsLib from './settings.js';
 import * as storage from './storage.js';
 import * as wakeLock from './wakelock.js';
 import * as membersLib from './members.js';
+import * as teamsLib from './teams.js';
+import * as setupLib from './setup.js';
 import * as alerts from './alerts.js';
 import * as notify from './notify.js';
 import { currentEnv, DEV } from './env.js';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog } from './dialog.js';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
 const HISTORY_KEY = 'history';
 const SETTINGS_KEY = 'settings';
 const MEMBERS_KEY = 'members';
-const LINEUP_KEY = 'lineup';
+const LINEUP_KEY = 'lineup'; // 旧形式（自分側の出場メンバーのみ）。読み込み時に setup へ移す
+const TEAMS_KEY = 'teams';
+const SETUP_KEY = 'setup';
 const DURATION_PRESETS = [5, 8, 10, 12, 15, 20];
 const TICK_MS = 250; // 表示更新の間隔。経過時間そのものは時刻差から算出する
 const TOAST_MS = 3500;
@@ -41,6 +45,8 @@ const els = {
   finish: $('btn-finish'),
   wakeNote: $('wake-note'),
   scoreMy: $('score-my'),
+  nameMy: $('name-my'),
+  nameOpp: $('name-opp'),
   scoreOpp: $('score-opp'),
   scoreBtns: document.querySelectorAll('.btn-score'),
   undo: $('btn-undo'),
@@ -50,8 +56,14 @@ const els = {
   viewLive: $('view-live'),
   viewHistory: $('view-history'),
   viewMembers: $('view-members'),
-  lineupChips: $('lineup-chips'),
-  lineupCount: $('lineup-count'),
+  side: {
+    my: { select: $('team-select-my'), chips: $('lineup-chips'), count: $('lineup-count'), showAll: $('show-all-my') },
+    opp: { select: $('team-select-opp'), chips: $('lineup-chips-opp'), count: $('lineup-count-opp'), showAll: $('show-all-opp') },
+  },
+  teamList: $('team-list'),
+  teamsEmpty: $('teams-empty'),
+  teamsCount: $('teams-count'),
+  addTeam: $('btn-add-team'),
   lineupEmpty: $('lineup-empty'),
   memberList: $('member-list'),
   membersEmpty: $('members-empty'),
@@ -72,7 +84,7 @@ function statusLabel(over) {
 }
 
 const TEAM_LABEL = { [match.MY]: '自', [match.OPP]: '相手' };
-const TEAM_NAME = { my: '自チーム', opp: '相手' };
+const DEFAULT_SIDE_NAME = { my: '自チーム', opp: '相手' };
 const RESULT_LABEL = { win: '勝ち', draw: '引き分け', loss: '負け' };
 
 let state = sw.sanitize(storage.load(SW_KEY, null));
@@ -80,8 +92,23 @@ let game = match.sanitize(storage.load(MATCH_KEY, null));
 let records = history.sanitize(storage.load(HISTORY_KEY, null));
 let settings = settingsLib.sanitize(storage.load(SETTINGS_KEY, null));
 let members = membersLib.sanitize(storage.load(MEMBERS_KEY, null));
-// 出場メンバーの選択。試合のリセット・終了では消さず、次の試合に引き継ぐ
-let lineup = membersLib.sanitizeLineup(storage.load(LINEUP_KEY, null), members);
+let teams = teamsLib.sanitize(storage.load(TEAMS_KEY, null), members);
+// 試合の組み合わせ（両側のチームと出場メンバー）。試合のリセット・終了では消さず、次の試合に引き継ぐ
+let setup = setupLib.sanitize(storage.load(SETUP_KEY, null), members, teams, storage.load(LINEUP_KEY, null));
+// チームを選んだ側でも、チーム外のメンバーを選べるようにする表示切り替え（保存しない）
+const showAll = { my: false, opp: false };
+
+function sideTeam(side) {
+  return teamsLib.findTeam(teams, setup[side].teamId);
+}
+
+function sideName(side) {
+  return sideTeam(side)?.name ?? DEFAULT_SIDE_NAME[side];
+}
+
+function sideNames() {
+  return { my: sideName('my'), opp: sideName('opp') };
+}
 // 試合時間を過ぎた瞬間にだけ知らせるため、前回の表示が超過だったかを覚えておく
 let overShown = sw.isOvertime(sw.remainingMs(state, Date.now(), settings.matchSec));
 // 交代アラートの判定用: 前回確認した経過時間（計時中でないときは null）
@@ -215,7 +242,7 @@ function renderScore() {
       row.dataset.id = String(e.id);
       row.setAttribute(
         'aria-label',
-        `${sw.formatMarker(e.elapsedSec)} ${TEAM_NAME[e.team]} ${e.points}点。タップして修正`,
+        `${sw.formatMarker(e.elapsedSec)} ${sideName(e.team)} ${e.points}点。タップして修正`,
       );
       row.append(...eventSpans(e));
       li.append(row);
@@ -225,22 +252,75 @@ function renderScore() {
   els.timelineEmpty.hidden = items.length > 0;
 }
 
+function renderTeamSelect(select, side) {
+  const otherTeamId = setup[side === 'my' ? 'opp' : 'my'].teamId;
+  const options = [new Option(`チームなし（${DEFAULT_SIDE_NAME[side]}）`, '')];
+  for (const t of teams) {
+    const o = new Option(t.name, t.id);
+    // 同じチームを両側に選べない
+    o.disabled = t.id === otherTeamId;
+    options.push(o);
+  }
+  select.replaceChildren(...options);
+  select.value = setup[side].teamId ?? '';
+}
+
 function renderLineup() {
-  els.lineupCount.textContent = `${lineup.length}/${membersLib.MAX_LINEUP}`;
   els.lineupEmpty.hidden = members.length > 0;
-  const full = lineup.length >= membersLib.MAX_LINEUP;
-  els.lineupChips.replaceChildren(
-    ...members.map((m) => {
-      const on = lineup.includes(m.id);
+  for (const side of setupLib.SIDES) {
+    const ui = els.side[side];
+    const { lineup } = setup[side];
+    const taken = new Set(setup[side === 'my' ? 'opp' : 'my'].lineup);
+    renderTeamSelect(ui.select, side);
+    ui.select.hidden = teams.length === 0;
+    ui.count.textContent = `${lineup.length}/${membersLib.MAX_LINEUP}`;
+    const team = sideTeam(side);
+    // チームを選んだ側はそのチームのメンバー（＋選択済みの人）だけを出す。「ほかのメンバーも表示」で全員
+    const shown = team && !showAll[side] ? members.filter((m) => team.memberIds.includes(m.id) || lineup.includes(m.id)) : members;
+    ui.showAll.hidden = !team || shown.length === members.length;
+    const full = lineup.length >= membersLib.MAX_LINEUP;
+    ui.chips.replaceChildren(
+      ...shown.map((m) => {
+        const on = lineup.includes(m.id);
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.dataset.id = m.id;
+        b.setAttribute('aria-pressed', String(on));
+        // 上限まで選択済み、または相手側に出ている人は押せない
+        b.disabled = !on && (full || taken.has(m.id));
+        if (!on && taken.has(m.id)) b.classList.add('taken');
+        b.textContent = m.name;
+        return b;
+      }),
+    );
+  }
+}
+
+function renderNames() {
+  els.nameMy.textContent = sideName('my');
+  els.nameOpp.textContent = sideName('opp');
+  for (const btn of els.scoreBtns) btn.setAttribute('aria-label', `${sideName(btn.dataset.team)} ${btn.dataset.points}点`);
+}
+
+function renderTeams() {
+  els.teamsEmpty.hidden = teams.length > 0;
+  els.teamsCount.textContent = teams.length > 0 ? `${teams.length}チーム` : '';
+  els.teamList.replaceChildren(
+    ...teams.map((t) => {
+      const li = document.createElement('li');
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'chip';
-      b.dataset.id = m.id;
-      b.setAttribute('aria-pressed', String(on));
-      // 上限まで選択済みのときは、未選択のメンバーを押せなくする
-      b.disabled = full && !on;
-      b.textContent = m.name;
-      return b;
+      b.className = 'member-row team-row';
+      b.dataset.id = t.id;
+      b.setAttribute('aria-label', `${t.name}。タップして編集`);
+      const names = teamsLib.teamMembers(t, members).map((m) => m.name);
+      const info = document.createElement('span');
+      info.className = 'team-info';
+      info.append(span('member-name', t.name), span('team-members', names.length > 0 ? names.join('・') : 'メンバーなし'));
+      b.append(info, span('member-edit', `${names.length}人`));
+      li.append(b);
+      return li;
     }),
   );
 }
@@ -264,7 +344,11 @@ function renderMembers() {
 }
 
 function saveMembers() {
-  const ok = storage.save(MEMBERS_KEY, members) && storage.save(LINEUP_KEY, lineup);
+  // 名簿・チームの変更に合わせて組み合わせの整合をとる
+  teams = teamsLib.sanitize(teams, members);
+  setup = setupLib.sanitize(setup, members, teams);
+  const ok = storage.save(MEMBERS_KEY, members) && storage.save(TEAMS_KEY, teams) && storage.save(SETUP_KEY, setup);
+  storage.remove(LINEUP_KEY);
   if (!ok) showNote('メンバーを保存できませんでした。ブラウザの設定を確認してください。');
 }
 
@@ -283,12 +367,20 @@ function buildMatchItem(rec) {
     // 手入力の試合は試合時間を持たない
     span('match-time', rec.durationSec > 0 || rec.events.length > 0 ? sw.formatClock(rec.durationSec * 1000) : '—'),
   );
-  if (rec.members.length > 0) {
+  const myName = rec.myTeam?.name ?? DEFAULT_SIDE_NAME.my;
+  const oppName = rec.oppTeam?.name ?? DEFAULT_SIDE_NAME.opp;
+  if (rec.myTeam || rec.oppTeam) summary.append(span('match-teams', `${myName} vs ${oppName}`));
+  // 両側の区別が要るときだけ、名前の前にチーム名を付ける
+  const labeled = Boolean(rec.myTeam || rec.oppTeam || rec.oppMembers.length > 0);
+  const memberLine = (className, list, prefix) => {
     // 名前の途中で改行しないよう、1人ずつ折り返し不可の span にする
-    const names = span('match-members', '');
-    rec.members.forEach((m, i) => names.append(span('mm-name', i < rec.members.length - 1 ? `${m.name}・` : m.name)));
-    summary.append(names);
-  }
+    const line = span(className, '');
+    if (prefix) line.append(span('mm-side', `${prefix}：`));
+    list.forEach((m, i) => line.append(span('mm-name', i < list.length - 1 ? `${m.name}・` : m.name)));
+    summary.append(line);
+  };
+  if (rec.members.length > 0) memberLine('match-members', rec.members, labeled ? myName : '');
+  if (rec.oppMembers.length > 0) memberLine('match-members match-members-opp', rec.oppMembers, oppName);
 
   const list = document.createElement('ol');
   list.className = 'match-events';
@@ -347,6 +439,7 @@ function render() {
   renderStopwatch();
   renderScore();
   renderLineup();
+  renderNames();
 }
 
 function setView(name) {
@@ -358,7 +451,10 @@ function setView(name) {
     else tab.removeAttribute('aria-current');
   }
   if (name === 'history') renderHistory();
-  if (name === 'members') renderMembers();
+  if (name === 'members') {
+    renderTeams();
+    renderMembers();
+  }
   window.scrollTo(0, 0);
 }
 
@@ -458,8 +554,14 @@ els.finish.addEventListener('click', async () => {
   const events = game.events;
   const t = match.totals(game);
   const label = RESULT_LABEL[match.result(t)];
-  const lineupMembers = membersLib.snapshot(members, lineup);
+  const lineupMembers = membersLib.snapshot(members, setup.my.lineup);
+  const oppMembers = membersLib.snapshot(members, setup.opp.lineup);
+  const names = sideNames();
   const lineupNames = lineupMembers.map((m) => m.name);
+  const teamRef = (side) => {
+    const team = sideTeam(side);
+    return team ? { id: team.id, name: team.name } : null;
+  };
   const extra = durationSec - settings.matchSec;
   const timeText =
     sw.formatClock(durationSec * 1000) + (extra > 0 ? `（延長 +${sw.formatClock(extra * 1000)}）` : '');
@@ -467,10 +569,12 @@ els.finish.addEventListener('click', async () => {
   const ok = await confirmDialog({
     title: '試合を終了しますか？',
     message:
-      `最終スコア　自チーム ${t.my} - ${t.opp} 相手（${label}）\n` +
+      `最終スコア　${names.my} ${t.my} - ${t.opp} ${names.opp}（${label}）\n` +
       `試合時間　${timeText}\n` +
       `得点　${events.length}件\n` +
-      `メンバー　${lineupNames.length > 0 ? lineupNames.join('・') : '未選択'}\n\n` +
+      `メンバー　${lineupNames.length > 0 ? lineupNames.join('・') : '未選択'}\n` +
+      (oppMembers.length > 0 ? `相手のメンバー　${oppMembers.map((m) => m.name).join('・')}\n` : '') +
+      '\n' +
       '履歴に保存して、新しい試合を始められる状態にします。',
     okLabel: '終了して保存',
   });
@@ -482,6 +586,9 @@ els.finish.addEventListener('click', async () => {
     durationSec,
     events,
     members: lineupMembers,
+    oppMembers,
+    myTeam: teamRef('my'),
+    oppTeam: teamRef('opp'),
   });
   const nextRecords = history.addRecord(records, record);
   // 履歴に保存できなかったときは、進行中の試合を消さない
@@ -516,7 +623,7 @@ els.timeline.addEventListener('click', async (e) => {
   const ev = game.events.find((x) => x.id === id);
   if (!ev) return;
 
-  const result = await editEventDialog(ev, TEAM_NAME);
+  const result = await editEventDialog(ev, sideNames());
   if (!result) return;
   if (result.action === 'delete') {
     apply(state, match.removeEvent(game, id));
@@ -561,9 +668,11 @@ function saveRecords(next, doneText) {
 }
 
 async function openRecordDialog(rec) {
-  // 選択肢: その試合のメンバー（当時の名前）＋登録中のメンバー
-  const choices = rec ? [...rec.members] : [];
+  // 選択肢: その試合のメンバー・チーム（当時の名前）＋登録中のもの
+  const choices = rec ? [...rec.members, ...rec.oppMembers] : [];
   for (const m of members) if (!choices.some((c) => c.id === m.id)) choices.push({ id: m.id, name: m.name });
+  const teamChoices = rec ? [rec.myTeam, rec.oppTeam].filter(Boolean) : [];
+  for (const t of teams) if (!teamChoices.some((c) => c.id === t.id)) teamChoices.push({ id: t.id, name: t.name });
   const s = rec ? history.summarize(rec) : { my: 0, opp: 0 };
   let note = '';
   if (rec && rec.events.length > 0) {
@@ -571,9 +680,18 @@ async function openRecordDialog(rec) {
     note = `得点の記録では ${t.my} - ${t.opp} です。スコアを変えると、手入力の修正として保存します。`;
   }
   const result = await recordDialog(rec, {
-    initial: { finishedAtMs: rec ? rec.finishedAtMs : Date.now(), my: s.my, opp: s.opp },
+    initial: {
+      finishedAtMs: rec ? rec.finishedAtMs : Date.now(),
+      my: s.my,
+      opp: s.opp,
+      // 手入力は今の組み合わせを初期値にする
+      myTeamId: rec ? rec.myTeam?.id ?? null : setup.my.teamId,
+      oppTeamId: rec ? rec.oppTeam?.id ?? null : setup.opp.teamId,
+      myIds: rec ? rec.members.map((m) => m.id) : [...setup.my.lineup],
+      oppIds: rec ? rec.oppMembers.map((m) => m.id) : [...setup.opp.lineup],
+    },
+    teams: teamChoices,
     choices,
-    selected: rec ? rec.members.map((m) => m.id) : [...lineup],
     maxMembers: membersLib.MAX_LINEUP,
     maxScore: history.MAX_SCORE,
     toInput: history.toLocalInput,
@@ -585,23 +703,21 @@ async function openRecordDialog(rec) {
     saveRecords(history.removeRecord(records, rec.id), '試合を削除しました');
     return;
   }
-  const picked = choices.filter((c) => result.memberIds.includes(c.id));
+  const pick = (ids) => choices.filter((c) => ids.includes(c.id));
+  const team = (id) => teamChoices.find((t) => t.id === id) ?? null;
+  const fields = {
+    finishedAtMs: result.finishedAtMs,
+    members: pick(result.myIds),
+    oppMembers: pick(result.oppIds),
+    myTeam: team(result.myTeamId),
+    oppTeam: team(result.oppTeamId),
+    my: result.my,
+    opp: result.opp,
+  };
   if (rec) {
-    const next = history.updateRecord(records, rec.id, {
-      finishedAtMs: result.finishedAtMs,
-      members: picked,
-      my: result.my,
-      opp: result.opp,
-    });
-    saveRecords(next, '試合を修正しました');
+    saveRecords(history.updateRecord(records, rec.id, fields), '試合を修正しました');
   } else {
-    const created = history.createManualRecord({
-      id: history.nextRecordId(records, Date.now()),
-      finishedAtMs: result.finishedAtMs,
-      my: result.my,
-      opp: result.opp,
-      members: picked,
-    });
+    const created = history.createManualRecord({ id: history.nextRecordId(records, Date.now()), ...fields });
     saveRecords(history.addRecord(records, created), `試合を追加しました（${result.my} - ${result.opp}）`);
   }
 }
@@ -615,16 +731,73 @@ els.historyList.addEventListener('click', (e) => {
 
 els.addRecord.addEventListener('click', () => openRecordDialog(null));
 
-// --- メンバー ---
-els.lineupChips.addEventListener('click', (e) => {
-  const chip = e.target.closest('.chip');
-  if (!chip) return;
-  lineup = membersLib.toggleLineup(lineup, chip.dataset.id);
+// --- 出場チーム・メンバー（試合画面） ---
+function saveSetup() {
+  if (!storage.save(SETUP_KEY, setup)) showNote('出場メンバーを保存できませんでした。');
+  storage.remove(LINEUP_KEY);
+}
+
+for (const side of setupLib.SIDES) {
+  const ui = els.side[side];
+  ui.chips.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    setup = setupLib.toggleMember(setup, side, chip.dataset.id);
+    saveSetup();
+    renderLineup();
+    if (navigator.vibrate) navigator.vibrate(10);
+  });
+  ui.select.addEventListener('change', () => {
+    setup = setupLib.selectTeam(setup, side, ui.select.value || null, teams);
+    showAll[side] = false;
+    saveSetup();
+    renderLineup();
+    renderNames();
+    renderScore();
+  });
+  ui.showAll.addEventListener('click', () => {
+    showAll[side] = true;
+    renderLineup();
+  });
+}
+
+function refreshAfterRosterChange() {
   saveMembers();
+  renderMembers();
+  renderTeams();
   renderLineup();
-  if (navigator.vibrate) navigator.vibrate(10);
+  renderNames();
+}
+
+// --- チーム ---
+els.addTeam.addEventListener('click', async () => {
+  const result = await teamDialog(null, {
+    members,
+    validate: (name) => (teams.length >= teamsLib.MAX_TEAMS ? `チームは${teamsLib.MAX_TEAMS}までです` : teamsLib.validateTeamName(teams, name)),
+    maxLen: teamsLib.MAX_TEAM_NAME_LEN,
+  });
+  if (!result) return;
+  teams = teamsLib.addTeam(teams, result.name, result.memberIds);
+  refreshAfterRosterChange();
 });
 
+els.teamList.addEventListener('click', async (e) => {
+  const row = e.target.closest('.team-row');
+  if (!row) return;
+  const team = teamsLib.findTeam(teams, row.dataset.id);
+  if (!team) return;
+  const result = await teamDialog(team, {
+    members,
+    validate: (name) => teamsLib.validateTeamName(teams, name, team.id),
+    maxLen: teamsLib.MAX_TEAM_NAME_LEN,
+  });
+  if (!result) return;
+  if (result.action === 'delete') teams = teamsLib.removeTeam(teams, team.id);
+  else teams = teamsLib.updateTeam(teams, team.id, { name: result.name, memberIds: result.memberIds });
+  refreshAfterRosterChange();
+});
+
+// --- メンバー ---
 els.addMember.addEventListener('click', async () => {
   const result = await memberDialog(null, {
     validate: (name) => (members.length >= membersLib.MAX_MEMBERS ? `登録は${membersLib.MAX_MEMBERS}人までです` : membersLib.validateName(members, name)),
@@ -632,9 +805,7 @@ els.addMember.addEventListener('click', async () => {
   });
   if (!result) return;
   members = membersLib.addMember(members, result.name);
-  saveMembers();
-  renderMembers();
-  renderLineup();
+  refreshAfterRosterChange();
 });
 
 els.memberList.addEventListener('click', async (e) => {
@@ -649,13 +820,11 @@ els.memberList.addEventListener('click', async (e) => {
   if (!result) return;
   if (result.action === 'delete') {
     members = membersLib.removeMember(members, member.id);
-    lineup = membersLib.sanitizeLineup(lineup, members);
+    teams = teamsLib.removeMemberFromTeams(teams, member.id);
   } else {
     members = membersLib.renameMember(members, member.id, result.name);
   }
-  saveMembers();
-  renderMembers();
-  renderLineup();
+  refreshAfterRosterChange();
 });
 
 // --- 画面切り替え ---

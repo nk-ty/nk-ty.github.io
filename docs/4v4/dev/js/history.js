@@ -4,14 +4,21 @@
 
 import * as match from './match.js';
 
-export function createRecord({ id, finishedAtMs, durationSec, events, members = [] }) {
+const teamRef = (t) => (t && typeof t.id === 'string' && typeof t.name === 'string' && t.name !== '' ? { id: t.id, name: t.name } : null);
+const memberRefs = (list) => (Array.isArray(list) ? list : []).map((m) => ({ id: m.id, name: m.name }));
+
+// members は自分側の出場メンバー、oppMembers は相手側。myTeam/oppTeam は { id, name } か null。
+// いずれも登録の変更に影響されないよう、その時点の名前の写しを持つ。
+export function createRecord({ id, finishedAtMs, durationSec, events, members = [], oppMembers = [], myTeam = null, oppTeam = null }) {
   return {
     id: String(id),
     finishedAtMs,
     durationSec: Math.max(0, Math.floor(durationSec)),
     events: events.map((e) => ({ ...e })),
-    // その試合に出たメンバーの名前（登録の変更に影響されないよう写しを持つ）
-    members: members.map((m) => ({ id: m.id, name: m.name })),
+    members: memberRefs(members),
+    oppMembers: memberRefs(oppMembers),
+    myTeam: teamRef(myTeam),
+    oppTeam: teamRef(oppTeam),
   };
 }
 
@@ -34,9 +41,9 @@ function validScore(n) {
 }
 
 // 手入力の試合（得点の時間は持たない）。
-export function createManualRecord({ id, finishedAtMs, my, opp, members = [] }) {
+export function createManualRecord({ id, finishedAtMs, my, opp, ...rest }) {
   return {
-    ...createRecord({ id, finishedAtMs, durationSec: 0, events: [], members }),
+    ...createRecord({ id, finishedAtMs, durationSec: 0, events: [], ...rest }),
     manual: { my, opp },
   };
 }
@@ -50,7 +57,7 @@ export function eventTotals(record) {
   return match.totals({ events: record.events });
 }
 
-// 試合の編集。patch: { finishedAtMs?, members?, my?, opp? }
+// 試合の編集。patch: { finishedAtMs?, members?, oppMembers?, myTeam?, oppTeam?, my?, opp? }
 // スコアが得点の記録と同じなら手入力の修正を外し、違えば manual として持つ。
 // 手入力の試合（得点の記録なし）は常に manual を持つ。
 export function updateRecord(history, id, patch) {
@@ -58,7 +65,10 @@ export function updateRecord(history, id, patch) {
     if (r.id !== id) return r;
     const next = { ...r };
     if (Number.isFinite(patch.finishedAtMs)) next.finishedAtMs = patch.finishedAtMs;
-    if (Array.isArray(patch.members)) next.members = patch.members.map((m) => ({ id: m.id, name: m.name }));
+    if (Array.isArray(patch.members)) next.members = memberRefs(patch.members);
+    if (Array.isArray(patch.oppMembers)) next.oppMembers = memberRefs(patch.oppMembers);
+    if ('myTeam' in patch) next.myTeam = teamRef(patch.myTeam);
+    if ('oppTeam' in patch) next.oppTeam = teamRef(patch.oppTeam);
     if (validScore(patch.my) && validScore(patch.opp)) {
       const t = eventTotals(r);
       if (r.events.length > 0 && t.my === patch.my && t.opp === patch.opp) delete next.manual;
@@ -121,6 +131,9 @@ export function sanitize(raw) {
       durationSec: Math.floor(r.durationSec),
       events: match.sanitize({ events: r.events }).events,
       members: memberList(r.members),
+      oppMembers: memberList(r.oppMembers),
+      myTeam: teamRef(r.myTeam),
+      oppTeam: teamRef(r.oppTeam),
       ...(r.manual && validScore(r.manual.my) && validScore(r.manual.opp)
         ? { manual: { my: r.manual.my, opp: r.manual.opp } }
         : {}),

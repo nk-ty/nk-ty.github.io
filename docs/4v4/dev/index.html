@@ -42,7 +42,7 @@
         <section class="card scoreboard" aria-label="スコア">
           <div class="teams">
             <div class="team team-my">
-              <h2>自チーム</h2>
+              <h2 id="name-my">自チーム</h2>
               <p class="score" id="score-my" aria-live="polite">0</p>
               <div class="score-btns">
                 <button type="button" class="btn btn-score" data-team="my" data-points="2" aria-label="自チーム 2点">+2</button>
@@ -50,7 +50,7 @@
               </div>
             </div>
             <div class="team team-opp">
-              <h2>相手</h2>
+              <h2 id="name-opp">相手</h2>
               <p class="score" id="score-opp" aria-live="polite">0</p>
               <div class="score-btns">
                 <button type="button" class="btn btn-score" data-team="opp" data-points="2" aria-label="相手 2点">+2</button>
@@ -63,10 +63,27 @@
           <button type="button" class="btn btn-ghost btn-undo" id="btn-undo" disabled>直前の得点を取り消す</button>
         </section>
 
-        <section class="card lineup" aria-label="出場メンバー">
-          <h2>出場メンバー <span class="hint" id="lineup-count">0/6</span></h2>
-          <div class="chips" id="lineup-chips"></div>
-          <p class="empty" id="lineup-empty">「メンバー」タブで登録すると、ここで選べます</p>
+        <section class="card lineup" aria-label="出場チーム・メンバー">
+          <h2>出場チーム・メンバー</h2>
+          <div class="side side-my">
+            <div class="side-head">
+              <span class="side-label side-label-my">自分側</span>
+              <select class="team-select" id="team-select-my" data-side="my" aria-label="自分側のチーム"></select>
+              <span class="hint" id="lineup-count">0/6</span>
+            </div>
+            <div class="chips" id="lineup-chips" data-side="my"></div>
+            <button type="button" class="btn-link" id="show-all-my" data-side="my" hidden>ほかのメンバーも表示</button>
+          </div>
+          <div class="side side-opp">
+            <div class="side-head">
+              <span class="side-label side-label-opp">相手側</span>
+              <select class="team-select" id="team-select-opp" data-side="opp" aria-label="相手側のチーム"></select>
+              <span class="hint" id="lineup-count-opp">0/6</span>
+            </div>
+            <div class="chips" id="lineup-chips-opp" data-side="opp"></div>
+            <button type="button" class="btn-link" id="show-all-opp" data-side="opp" hidden>ほかのメンバーも表示</button>
+          </div>
+          <p class="empty" id="lineup-empty">「チーム」タブでメンバーとチームを登録すると、ここで選べます</p>
         </section>
 
         <section class="card timeline" aria-label="得点の履歴">
@@ -78,6 +95,13 @@
 
       <!-- 履歴（終了した試合） -->
       <div id="view-members" hidden>
+        <section class="card members team-card" aria-label="チーム">
+          <h2>チーム <span class="hint" id="teams-count"></span></h2>
+          <ul class="member-list" id="team-list"></ul>
+          <p class="empty" id="teams-empty">まだチームが登録されていません</p>
+          <button type="button" class="btn btn-primary" id="btn-add-team">チームを追加</button>
+        </section>
+
         <section class="card members" aria-label="メンバー">
           <h2>メンバー <span class="hint" id="members-count"></span></h2>
           <ul class="member-list" id="member-list"></ul>
@@ -100,7 +124,7 @@
   <nav class="tabbar" aria-label="画面の切り替え">
     <div class="tabbar-inner">
       <button type="button" class="tab" id="tab-live" data-view="live" aria-current="page">試合</button>
-      <button type="button" class="tab" id="tab-members" data-view="members">メンバー</button>
+      <button type="button" class="tab" id="tab-members" data-view="members">チーム</button>
       <button type="button" class="tab" id="tab-history" data-view="history">履歴 <span class="tab-count" id="history-count" hidden>0</span></button>
     </div>
   </nav>

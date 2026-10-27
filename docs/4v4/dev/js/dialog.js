@@ -314,37 +314,116 @@ export function memberDialog(member, { validate, maxLen }) {
   });
 }
 
-// 終了した試合の編集・手入力ダイアログ。
-// record が null なら新規（手入力）。choices は選べるメンバー [{id,name}]、selected は選択済み id。
-// 戻り値: { action: 'save', finishedAtMs, my, opp, memberIds } | { action: 'delete' } | null
-export function recordDialog(record, { initial, choices, selected, maxMembers, maxScore, toInput, fromInput, note }) {
+// チップで複数選択する部品。max を超えて選べず、isBlocked(id) が true の人は選べない。
+function chipPicker(choices, selected, { max = Infinity, side = '', isBlocked = () => false, onChange = () => {} } = {}) {
+  let picked = [...selected];
+  const wrap = el('div', { className: 'chips' });
+  if (side) wrap.dataset.side = side;
+  const render = () => {
+    const full = picked.length >= max;
+    wrap.replaceChildren(
+      ...choices.map((m) => {
+        const on = picked.includes(m.id);
+        const b = el('button', { type: 'button', className: 'chip', textContent: m.name, disabled: !on && (full || isBlocked(m.id)) });
+        b.dataset.id = m.id;
+        b.setAttribute('aria-pressed', String(on));
+        b.addEventListener('click', () => {
+          picked = on ? picked.filter((x) => x !== m.id) : [...picked, m.id];
+          render();
+          onChange();
+        });
+        return b;
+      }),
+    );
+  };
+  render();
+  return { node: wrap, get: () => picked, render };
+}
+
+function teamSelect(teams, value, label, noneLabel) {
+  const sel = el('select', { className: 'team-select' });
+  sel.setAttribute('aria-label', label);
+  sel.append(el('option', { value: '', textContent: noneLabel }));
+  for (const t of teams) sel.append(el('option', { value: t.id, textContent: t.name }));
+  sel.value = value ?? '';
+  return sel;
+}
+
+// チームの追加・編集ダイアログ。team が null なら追加。メンバーは何人でも選べる（兼任可）。
+// 戻り値: { action: 'save', name, memberIds } | { action: 'delete' } | null
+export function teamDialog(team, { members, validate, maxLen }) {
+  return openDialog((finish) => {
+    const input = el('input', { type: 'text', value: team ? team.name : '', maxLength: maxLen * 2 });
+    input.setAttribute('aria-label', 'チーム名');
+    input.setAttribute('autocomplete', 'off');
+    const error = el('p', { className: 'dlg-error', hidden: true, role: 'alert' });
+    const picker = chipPicker(members, team ? team.memberIds : []);
+
+    const save = () => {
+      const message = validate(input.value);
+      if (message) {
+        error.textContent = message;
+        error.hidden = false;
+        return;
+      }
+      finish({ action: 'save', name: input.value, memberIds: picker.get() });
+    };
+
+    let del = null;
+    if (team) {
+      let armed = false;
+      del = button('チームを削除', 'btn-danger-ghost', 'delete', () => {
+        if (!armed) {
+          armed = true;
+          del.textContent = 'もう一度タップで削除';
+          return;
+        }
+        finish({ action: 'delete' });
+      });
+    }
+
+    return el(
+      'div',
+      { className: 'dlg-body' },
+      el('h2', { className: 'dlg-title', textContent: team ? 'チームを編集' : 'チームを追加' }),
+      el('div', { className: 'dlg-field' }, el('p', { className: 'dlg-label', textContent: 'チーム名' }), el('label', { className: 'text-field' }, input)),
+      el(
+        'div',
+        { className: 'dlg-field' },
+        el('p', { className: 'dlg-label', textContent: 'メンバー（ほかのチームと兼任できます）' }),
+        members.length > 0 ? picker.node : el('p', { className: 'dlg-note', textContent: '先に下の「メンバー」でメンバーを登録してください' }),
+      ),
+      error,
+      el(
+        'div',
+        { className: 'dlg-actions' },
+        button('キャンセル', 'btn-ghost', 'cancel', () => finish(null)),
+        button('保存', 'btn-primary', 'save', save),
+      ),
+      ...(del ? [del] : []),
+    );
+  });
+}
+
+// 終了した試合の編集・手入力ダイアログ。record が null なら新規（手入力）。
+// teams は選べるチーム [{id,name}]、choices は選べるメンバー [{id,name}]。
+// 戻り値: { action: 'save', finishedAtMs, my, opp, myTeamId, oppTeamId, myIds, oppIds } | { action: 'delete' } | null
+export function recordDialog(record, { initial, teams, choices, maxMembers, maxScore, toInput, fromInput, note }) {
   return openDialog((finish) => {
     const when = el('input', { type: 'datetime-local', value: toInput(initial.finishedAtMs) });
     when.setAttribute('aria-label', '日時');
-    const my = numberField('自チーム', initial.my, maxScore);
-    const opp = numberField('相手', initial.opp, maxScore);
+    const my = numberField('自分側', initial.my, maxScore);
+    const opp = numberField('相手側', initial.opp, maxScore);
     const error = el('p', { className: 'dlg-error', hidden: true, role: 'alert' });
 
-    // メンバー（上限まで）
-    let picked = [...selected];
-    const chipWrap = el('div', { className: 'chips' });
-    const renderChips = () => {
-      const full = picked.length >= maxMembers;
-      chipWrap.replaceChildren(
-        ...choices.map((m) => {
-          const on = picked.includes(m.id);
-          const b = el('button', { type: 'button', className: 'chip', textContent: m.name, disabled: full && !on });
-          b.dataset.id = m.id;
-          b.setAttribute('aria-pressed', String(on));
-          b.addEventListener('click', () => {
-            picked = on ? picked.filter((x) => x !== m.id) : [...picked, m.id];
-            renderChips();
-          });
-          return b;
-        }),
-      );
-    };
-    renderChips();
+    const mySel = teamSelect(teams, initial.myTeamId, '自分側のチーム', 'チームなし（自チーム）');
+    const oppSel = teamSelect(teams, initial.oppTeamId, '相手側のチーム', 'チームなし（相手）');
+    // 同じ人を両側に選べない
+    let myPick = null;
+    let oppPick = null;
+    myPick = chipPicker(choices, initial.myIds, { max: maxMembers, side: 'my', isBlocked: (id) => oppPick?.get().includes(id), onChange: () => oppPick?.render() });
+    oppPick = chipPicker(choices, initial.oppIds, { max: maxMembers, side: 'opp', isBlocked: (id) => myPick.get().includes(id), onChange: () => myPick.render() });
+    myPick.render();
 
     const save = () => {
       const at = fromInput(when.value);
@@ -355,8 +434,19 @@ export function recordDialog(record, { initial, choices, selected, maxMembers, m
         error.textContent = '日時を入力してください';
       } else if (!okScore(my.input.value, a) || !okScore(opp.input.value, b)) {
         error.textContent = `得点は 0〜${maxScore} の整数で入力してください`;
+      } else if (mySel.value !== '' && mySel.value === oppSel.value) {
+        error.textContent = '同じチームを両側に選べません';
       } else {
-        finish({ action: 'save', finishedAtMs: at, my: a, opp: b, memberIds: picked });
+        finish({
+          action: 'save',
+          finishedAtMs: at,
+          my: a,
+          opp: b,
+          myTeamId: mySel.value || null,
+          oppTeamId: oppSel.value || null,
+          myIds: myPick.get(),
+          oppIds: oppPick.get(),
+        });
         return;
       }
       error.hidden = false;
@@ -377,15 +467,18 @@ export function recordDialog(record, { initial, choices, selected, maxMembers, m
 
     const field = (label, ...children) =>
       el('div', { className: 'dlg-field' }, el('p', { className: 'dlg-label', textContent: label }), ...children);
+    const noMembers = () => el('p', { className: 'dlg-note', textContent: 'メンバーは「チーム」タブで登録できます' });
 
     return el(
       'div',
       { className: 'dlg-body' },
       el('h2', { className: 'dlg-title', textContent: record ? '試合を編集' : '試合を手入力' }),
       field('日時', el('label', { className: 'text-field' }, when)),
-      field('スコア', el('div', { className: 'num-row score-inputs' }, my.node, opp.node)),
+      field('スコア（自分側 - 相手側）', el('div', { className: 'num-row score-inputs' }, my.node, opp.node)),
       ...(note ? [el('p', { className: 'dlg-note', textContent: note })] : []),
-      field(`メンバー（最大${maxMembers}人）`, choices.length > 0 ? chipWrap : el('p', { className: 'dlg-note', textContent: 'メンバーは「メンバー」タブで登録できます' })),
+      field('自分側', mySel, choices.length > 0 ? myPick.node : noMembers()),
+      field('相手側', oppSel, choices.length > 0 ? oppPick.node : noMembers()),
+      el('p', { className: 'dlg-note', textContent: `メンバーは各側 最大${maxMembers}人` }),
       error,
       el(
         'div',

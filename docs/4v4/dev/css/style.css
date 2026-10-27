@@ -886,3 +886,129 @@ body {
   font-size: 0.85rem;
   white-space: nowrap;
 }
+
+/* チーム: 試合画面の両側の選択 */
+.side + .side {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.side-label {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.side-label-my {
+  color: var(--my);
+}
+
+.side-label-opp {
+  color: var(--opp);
+}
+
+.team-select {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+}
+
+.team-select[hidden] {
+  display: none;
+}
+
+.side-head .hint {
+  margin-left: auto;
+  flex: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.dlg .team-select {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.btn-link {
+  margin-top: 8px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.btn-link[hidden] {
+  display: none;
+}
+
+/* 相手側に出ている人 */
+.chip.taken {
+  text-decoration: line-through;
+}
+
+/* スコアの見出しにチーム名（長い名前は省略） */
+.team h2 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* チーム一覧 */
+.team-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-members {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.members + .members {
+  margin-top: 16px;
+}
+
+/* 履歴: 対戦カードと両側のメンバー */
+.match-teams {
+  grid-column: 1 / -1;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.mm-side {
+  font-weight: 700;
+}
+
+.team {
+  min-width: 0;
+}
+
+.member-edit {
+  flex: none;
+  margin-left: 12px;
+  white-space: nowrap;
+}
