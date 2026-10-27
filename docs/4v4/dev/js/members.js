@@ -2,7 +2,7 @@
 // 登録は { id, name } の配列。試合の選択（lineup）は id の配列で、最大 MAX_LINEUP 人。
 // 終了した試合には、その時点の名前を写して保存する（後で改名・削除しても履歴は変わらない）。
 
-export const MAX_LINEUP = 4;
+export const MAX_LINEUP = 6; // コート4人＋交代要員
 export const MAX_NAME_LEN = 12;
 export const MAX_MEMBERS = 30;
 

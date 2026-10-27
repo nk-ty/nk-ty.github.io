@@ -236,7 +236,7 @@ function renderLineup() {
       b.className = 'chip';
       b.dataset.id = m.id;
       b.setAttribute('aria-pressed', String(on));
-      // 4人選択済みのときは、未選択のメンバーを押せなくする
+      // 上限まで選択済みのときは、未選択のメンバーを押せなくする
       b.disabled = full && !on;
       b.textContent = m.name;
       return b;
@@ -281,7 +281,10 @@ function buildMatchItem(rec) {
     span('match-time', sw.formatClock(rec.durationSec * 1000)),
   );
   if (rec.members.length > 0) {
-    summary.append(span('match-members', rec.members.map((m) => m.name).join('・')));
+    // 名前の途中で改行しないよう、1人ずつ折り返し不可の span にする
+    const names = span('match-members', '');
+    rec.members.forEach((m, i) => names.append(span('mm-name', i < rec.members.length - 1 ? `${m.name}・` : m.name)));
+    summary.append(names);
   }
 
   const list = document.createElement('ol');

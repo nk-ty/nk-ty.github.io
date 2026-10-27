@@ -849,3 +849,7 @@ body {
 .members .btn-primary {
   width: 100%;
 }
+
+.mm-name {
+  white-space: nowrap;
+}
