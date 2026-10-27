@@ -24,6 +24,14 @@ export function elapsedSec(state, nowMs) {
   return Math.floor(elapsedMs(state, nowMs) / 1000);
 }
 
+// 時計の表示と一致する経過秒。得点の時間・試合時間の記録に使う。
+// 残り時間も超過も切り上げで表示するため、試合時間までは切り捨て、超過したら切り上げる。
+//   例(10分): 時計 00:01 → 9'59"、00:00 → 10'00"、+00:01 → 10'01"
+export function clockSec(state, nowMs, durationSec) {
+  const ms = elapsedMs(state, nowMs);
+  return ms > durationSec * 1000 ? Math.ceil(ms / 1000) : Math.floor(ms / 1000);
+}
+
 export function start(state, nowMs) {
   if (state.status !== IDLE) return state;
   return { status: RUNNING, startedAtMs: nowMs, accumulatedMs: 0 };
@@ -59,12 +67,12 @@ export function remainingMs(state, nowMs, durationSec) {
 // カウントダウン表示。
 //   残りがある間: 切り上げた「10:00」→「00:01」（開始直後も 10:00 のまま見える）
 //   ちょうど 0 : 「00:00」
-//   超過       : 「+00:01」のように、超過した時間を切り捨てで表示
+//   超過       : 「+00:01」のように、超過した時間を切り上げで表示（0 を過ぎた直後から +00:01）
 export function formatCountdown(remaining) {
   if (!Number.isFinite(remaining)) return formatClock(0);
   if (remaining > 0) return formatClock(Math.ceil(remaining / 1000) * 1000);
   if (remaining === 0) return formatClock(0);
-  return `+${formatClock(-remaining)}`;
+  return `+${formatClock(Math.ceil(-remaining / 1000) * 1000)}`;
 }
 
 // 試合時間を過ぎているか（ちょうど 0 は超過ではない）。

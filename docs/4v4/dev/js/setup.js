@@ -2,8 +2,8 @@
 // { my: { teamId, lineup }, opp: { teamId, lineup } }。teamId が null なら「チームなし」。
 // 同じチームを両側に選べない。同じ人を両側に出せない（兼任はチーム登録上の話）。
 
-import { MAX_LINEUP } from './members.js?v=d20688e';
-import { findTeam } from './teams.js?v=d20688e';
+import { MAX_LINEUP } from './members.js?v=d1d6009';
+import { findTeam } from './teams.js?v=d1d6009';
 
 export const SIDES = ['my', 'opp'];
 const other = (side) => (side === 'my' ? 'opp' : 'my');

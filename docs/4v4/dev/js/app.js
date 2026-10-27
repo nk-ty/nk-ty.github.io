@@ -1,17 +1,17 @@
-import * as sw from './stopwatch.js?v=d20688e';
-import * as match from './match.js?v=d20688e';
-import * as history from './history.js?v=d20688e';
-import * as settingsLib from './settings.js?v=d20688e';
-import * as storage from './storage.js?v=d20688e';
-import * as wakeLock from './wakelock.js?v=d20688e';
-import * as membersLib from './members.js?v=d20688e';
-import * as teamsLib from './teams.js?v=d20688e';
-import * as setupLib from './setup.js?v=d20688e';
-import * as stats from './stats.js?v=d20688e';
-import * as alerts from './alerts.js?v=d20688e';
-import * as notify from './notify.js?v=d20688e';
-import { currentEnv, DEV } from './env.js?v=d20688e';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=d20688e';
+import * as sw from './stopwatch.js?v=d1d6009';
+import * as match from './match.js?v=d1d6009';
+import * as history from './history.js?v=d1d6009';
+import * as settingsLib from './settings.js?v=d1d6009';
+import * as storage from './storage.js?v=d1d6009';
+import * as wakeLock from './wakelock.js?v=d1d6009';
+import * as membersLib from './members.js?v=d1d6009';
+import * as teamsLib from './teams.js?v=d1d6009';
+import * as setupLib from './setup.js?v=d1d6009';
+import * as stats from './stats.js?v=d1d6009';
+import * as alerts from './alerts.js?v=d1d6009';
+import * as notify from './notify.js?v=d1d6009';
+import { currentEnv, DEV } from './env.js?v=d1d6009';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=d1d6009';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
@@ -614,9 +614,9 @@ els.swap.addEventListener('click', async () => {
 
 // --- 試合終了 → 履歴に保存 ---
 els.finish.addEventListener('click', async () => {
-  // 確認ダイアログを開いている間も時計は進むため、押した瞬間の値を使う
+  // 確認ダイアログを開いている間も時計は進むため、押した瞬間の値を使う（時計の表示と同じ秒）
   const nowMs = Date.now();
-  const durationSec = sw.elapsedSec(state, nowMs);
+  const durationSec = sw.clockSec(state, nowMs, settings.matchSec);
   const events = game.events;
   const t = match.totals(game);
   const label = RESULT_LABEL[match.result(t)];
@@ -672,8 +672,8 @@ els.finish.addEventListener('click', async () => {
 for (const btn of els.scoreBtns) {
   btn.addEventListener('click', () => {
     const { team, points } = btn.dataset;
-    // 押した瞬間の経過時間を記録する（計時前・停止中でも、その時点の値）
-    const sec = sw.elapsedSec(state, Date.now());
+    // 押した瞬間の経過時間を、時計の表示と同じ秒で記録する（計時前・停止中でも、その時点の値）
+    const sec = sw.clockSec(state, Date.now(), settings.matchSec);
     apply(state, match.addScore(game, team, Number(points), sec));
     if (navigator.vibrate) navigator.vibrate(15);
   });
@@ -871,7 +871,7 @@ els.addTeam.addEventListener('click', async () => {
     maxLen: teamsLib.MAX_TEAM_NAME_LEN,
   });
   if (!result) return;
-  teams = teamsLib.addTeam(teams, result.name, result.memberIds);
+  teams = teamsLib.addTeam(teams, result.name, result.memberIds, history.usedTeamIds(records));
   refreshAfterRosterChange();
 });
 
@@ -898,7 +898,7 @@ els.addMember.addEventListener('click', async () => {
     maxLen: membersLib.MAX_NAME_LEN,
   });
   if (!result) return;
-  members = membersLib.addMember(members, result.name);
+  members = membersLib.addMember(members, result.name, history.usedMemberIds(records));
   refreshAfterRosterChange();
 });
 

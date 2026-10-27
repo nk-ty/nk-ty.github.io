@@ -19,19 +19,21 @@ export function validateName(members, raw, exceptId = null) {
   return null;
 }
 
-function nextId(members) {
+// 新しい id は「登録中＋reserved（履歴に残っている id など）」の最大＋1。
+// 履歴は id と当時の名前を持つため、履歴にある id を別人に再利用しないよう reserved に含める。
+function nextId(members, reserved = []) {
   let max = 0;
-  for (const m of members) {
-    const n = Number(String(m.id).replace(/^p/, ''));
+  for (const id of [...members.map((m) => m.id), ...reserved]) {
+    const n = Number(String(id).replace(/^p/, ''));
     if (Number.isInteger(n) && n > max) max = n;
   }
   return `p${max + 1}`;
 }
 
 // 追加。検証に通らない・上限超過のときは元の配列をそのまま返す。
-export function addMember(members, raw) {
+export function addMember(members, raw, reserved = []) {
   if (members.length >= MAX_MEMBERS || validateName(members, raw)) return members;
-  return [...members, { id: nextId(members), name: normalizeName(raw) }];
+  return [...members, { id: nextId(members, reserved), name: normalizeName(raw) }];
 }
 
 export function renameMember(members, id, raw) {

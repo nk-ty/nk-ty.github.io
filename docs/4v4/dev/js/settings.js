@@ -37,7 +37,8 @@ export function sanitize(raw) {
   if (!raw || typeof raw !== 'object') return d;
   const m = raw.matchSec;
   const s = raw.swapSec;
-  const matchOk = Number.isInteger(m) && m >= MIN_MINUTES * 60 && m <= MAX_MINUTES * 60;
+  // 画面で設定できるのは分単位だけなので、60の倍数以外は壊れた値として既定に戻す（交代間隔と同じ扱い）
+  const matchOk = Number.isInteger(m) && m % 60 === 0 && m >= MIN_MINUTES * 60 && m <= MAX_MINUTES * 60;
   const swapOk = Number.isInteger(s) && s % 60 === 0 && s >= 0 && s <= MAX_SWAP_MINUTES * 60;
   return { matchSec: matchOk ? m : d.matchSec, swapSec: swapOk ? s : d.swapSec };
 }

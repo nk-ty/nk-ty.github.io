@@ -2,7 +2,7 @@
 // 試合記録は得点イベントを保存し、スコア・勝敗はイベントから算出する。
 // ただし手入力の試合や、後からスコアを直した試合は manual: { my, opp } を持ち、そちらを優先する。
 
-import * as match from './match.js?v=d20688e';
+import * as match from './match.js?v=d1d6009';
 
 const teamRef = (t) => (t && typeof t.id === 'string' && typeof t.name === 'string' && t.name !== '' ? { id: t.id, name: t.name } : null);
 const memberRefs = (list) => (Array.isArray(list) ? list : []).map((m) => ({ id: m.id, name: m.name }));
@@ -76,6 +76,15 @@ export function updateRecord(history, id, patch) {
     }
     return next;
   });
+}
+
+// 履歴に残っているメンバー・チームの id（新しい登録で再利用しないために使う）。
+export function usedMemberIds(history) {
+  return history.flatMap((r) => [...r.members, ...r.oppMembers].map((m) => m.id));
+}
+
+export function usedTeamIds(history) {
+  return history.flatMap((r) => [r.myTeam?.id, r.oppTeam?.id]).filter(Boolean);
 }
 
 export function removeRecord(history, id) {
@@ -154,6 +163,7 @@ export function fromLocalInput(text) {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text ?? '');
   if (!m) return null;
   const [y, mo, d, h, mi] = m.slice(1).map(Number);
+  if (h > 23 || mi > 59) return null; // 「12:60」を 13:00 に繰り上げない
   const date = new Date(y, mo - 1, d, h, mi);
   if (date.getMonth() !== mo - 1 || date.getDate() !== d) return null; // 2/30 など
   return date.getTime();

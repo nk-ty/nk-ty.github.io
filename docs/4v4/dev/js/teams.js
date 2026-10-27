@@ -16,10 +16,11 @@ export function validateTeamName(teams, raw, exceptId = null) {
   return null;
 }
 
-function nextId(teams) {
+// 新しい id は「登録中＋reserved（履歴に残っている id など）」の最大＋1。履歴の id を別チームに再利用しない。
+function nextId(teams, reserved = []) {
   let max = 0;
-  for (const t of teams) {
-    const n = Number(String(t.id).replace(/^t/, ''));
+  for (const id of [...teams.map((t) => t.id), ...reserved]) {
+    const n = Number(String(id).replace(/^t/, ''));
     if (Number.isInteger(n) && n > max) max = n;
   }
   return `t${max + 1}`;
@@ -29,9 +30,9 @@ function uniqueIds(ids) {
   return Array.isArray(ids) ? [...new Set(ids.filter((x) => typeof x === 'string' && x !== ''))] : [];
 }
 
-export function addTeam(teams, raw, memberIds = []) {
+export function addTeam(teams, raw, memberIds = [], reserved = []) {
   if (teams.length >= MAX_TEAMS || validateTeamName(teams, raw)) return teams;
-  return [...teams, { id: nextId(teams), name: normalizeName(raw), memberIds: uniqueIds(memberIds) }];
+  return [...teams, { id: nextId(teams, reserved), name: normalizeName(raw), memberIds: uniqueIds(memberIds) }];
 }
 
 export function updateTeam(teams, id, { name, memberIds }) {
