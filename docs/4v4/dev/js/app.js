@@ -1,17 +1,17 @@
-import * as sw from './stopwatch.js?v=d1d6009';
-import * as match from './match.js?v=d1d6009';
-import * as history from './history.js?v=d1d6009';
-import * as settingsLib from './settings.js?v=d1d6009';
-import * as storage from './storage.js?v=d1d6009';
-import * as wakeLock from './wakelock.js?v=d1d6009';
-import * as membersLib from './members.js?v=d1d6009';
-import * as teamsLib from './teams.js?v=d1d6009';
-import * as setupLib from './setup.js?v=d1d6009';
-import * as stats from './stats.js?v=d1d6009';
-import * as alerts from './alerts.js?v=d1d6009';
-import * as notify from './notify.js?v=d1d6009';
-import { currentEnv, DEV } from './env.js?v=d1d6009';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=d1d6009';
+import * as sw from './stopwatch.js?v=9d84e60';
+import * as match from './match.js?v=9d84e60';
+import * as history from './history.js?v=9d84e60';
+import * as settingsLib from './settings.js?v=9d84e60';
+import * as storage from './storage.js?v=9d84e60';
+import * as wakeLock from './wakelock.js?v=9d84e60';
+import * as membersLib from './members.js?v=9d84e60';
+import * as teamsLib from './teams.js?v=9d84e60';
+import * as setupLib from './setup.js?v=9d84e60';
+import * as stats from './stats.js?v=9d84e60';
+import * as alerts from './alerts.js?v=9d84e60';
+import * as notify from './notify.js?v=9d84e60';
+import { currentEnv, DEV } from './env.js?v=9d84e60';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=9d84e60';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
@@ -57,6 +57,9 @@ const els = {
   viewLive: $('view-live'),
   viewHistory: $('view-history'),
   viewMembers: $('view-members'),
+  viewAbout: $('view-about'),
+  about: $('btn-about'),
+  aboutBack: $('btn-about-back'),
   side: {
     my: { select: $('team-select-my'), chips: $('lineup-chips'), count: $('lineup-count'), showAll: $('show-all-my') },
     opp: { select: $('team-select-opp'), chips: $('lineup-chips-opp'), count: $('lineup-count-opp'), showAll: $('show-all-opp') },
@@ -508,7 +511,13 @@ function render() {
   renderNames();
 }
 
+// 「このアプリについて」から戻る先
+let lastView = 'live';
+
 function setView(name) {
+  if (name !== 'about') lastView = name;
+  els.viewAbout.hidden = name !== 'about';
+  els.about.hidden = name === 'about';
   els.viewLive.hidden = name !== 'live';
   els.viewHistory.hidden = name !== 'history';
   els.viewMembers.hidden = name !== 'members';
@@ -920,6 +929,10 @@ els.memberList.addEventListener('click', async (e) => {
   }
   refreshAfterRosterChange();
 });
+
+// --- このアプリについて ---
+els.about.addEventListener('click', () => setView('about'));
+els.aboutBack.addEventListener('click', () => setView(lastView));
 
 // --- 画面切り替え ---
 for (const tab of els.tabs) {

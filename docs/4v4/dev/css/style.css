@@ -1124,3 +1124,86 @@ body {
 .history-list {
   clear: both;
 }
+
+/* ヘッダー右上の「使い方・規約」 */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0 8px;
+}
+
+.app-header h1 {
+  padding: 0;
+}
+
+.header-link {
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.header-link[hidden] {
+  display: none;
+}
+
+/* このアプリについて */
+.about-back {
+  margin: 0 0 8px;
+}
+
+.about h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.about p,
+.about li,
+.about dd {
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+
+.about p {
+  margin: 0 0 8px;
+}
+
+.about ol,
+.about ul {
+  margin: 0;
+  padding-left: 1.3em;
+}
+
+.about li + li {
+  margin-top: 6px;
+}
+
+.about ul ul {
+  margin-top: 4px;
+}
+
+.about dt {
+  margin-top: 12px;
+  font-weight: 700;
+}
+
+.about dt:first-child {
+  margin-top: 0;
+}
+
+.about dd {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.about a {
+  color: var(--my);
+}
