@@ -853,3 +853,36 @@ body {
 .mm-name {
   white-space: nowrap;
 }
+
+/* 履歴の編集・手入力 */
+.btn-edit-record {
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+}
+
+.btn-block {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.dlg-note {
+  margin: -4px 0 16px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* スコア入力: ラベルを入力欄の上に置く（「自チーム」を折り返さない） */
+.score-inputs .num {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.score-inputs .num span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}

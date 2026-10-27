@@ -8,7 +8,7 @@ import * as membersLib from './members.js';
 import * as alerts from './alerts.js';
 import * as notify from './notify.js';
 import { currentEnv, DEV } from './env.js';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog } from './dialog.js';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog } from './dialog.js';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
@@ -57,6 +57,7 @@ const els = {
   membersEmpty: $('members-empty'),
   membersCount: $('members-count'),
   addMember: $('btn-add-member'),
+  addRecord: $('btn-add-record'),
   tabs: document.querySelectorAll('.tab'),
   historyList: $('history-list'),
   historyEmpty: $('history-empty'),
@@ -272,13 +273,15 @@ function buildMatchItem(rec) {
   const li = document.createElement('li');
   const details = document.createElement('details');
   details.className = 'match';
+  details.dataset.id = rec.id;
 
   const summary = document.createElement('summary');
   summary.append(
     span('match-date', history.formatDateTime(rec.finishedAtMs)),
     span(`match-result res-${s.result}`, RESULT_LABEL[s.result]),
     span('match-score', `${s.my} - ${s.opp}`),
-    span('match-time', sw.formatClock(rec.durationSec * 1000)),
+    // 手入力の試合は試合時間を持たない
+    span('match-time', rec.durationSec > 0 || rec.events.length > 0 ? sw.formatClock(rec.durationSec * 1000) : '—'),
   );
   if (rec.members.length > 0) {
     // 名前の途中で改行しないよう、1人ずつ折り返し不可の span にする
@@ -290,11 +293,20 @@ function buildMatchItem(rec) {
   const list = document.createElement('ol');
   list.className = 'match-events';
   const timeline = history.recordTimeline(rec);
-  if (timeline.length === 0) {
-    const empty = document.createElement('li');
-    empty.className = 'tl-empty';
-    empty.textContent = '得点なし';
-    list.append(empty);
+  const noteItem = (text) => {
+    const item = document.createElement('li');
+    item.className = 'tl-empty';
+    item.textContent = text;
+    list.append(item);
+  };
+  if (history.isManual(rec) && rec.events.length === 0) {
+    noteItem('手入力の試合（得点の時間なし）');
+  } else if (history.isManual(rec)) {
+    const t = history.eventTotals(rec);
+    noteItem(`スコアは手入力で修正済み（得点の記録では ${t.my} - ${t.opp}）`);
+  }
+  if (timeline.length === 0 && !history.isManual(rec)) {
+    noteItem('得点なし');
   } else {
     for (const e of timeline) {
       const item = document.createElement('li');
@@ -304,14 +316,28 @@ function buildMatchItem(rec) {
     }
   }
 
-  details.append(summary, list);
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn btn-ghost btn-edit-record';
+  editBtn.dataset.id = rec.id;
+  editBtn.textContent = '編集・削除';
+
+  details.append(summary, list, editBtn);
   li.append(details);
   return li;
 }
 
 function renderHistory() {
   const list = history.newestFirst(records);
-  els.historyList.replaceChildren(...list.map(buildMatchItem));
+  // 編集後も、開いていた試合は開いたままにする
+  const open = new Set([...els.historyList.querySelectorAll('details[open]')].map((d) => d.dataset.id));
+  els.historyList.replaceChildren(
+    ...list.map((rec) => {
+      const li = buildMatchItem(rec);
+      if (open.has(rec.id)) li.querySelector('details').open = true;
+      return li;
+    }),
+  );
   els.historyEmpty.hidden = list.length > 0;
   els.historyCount.hidden = list.length === 0;
   els.historyCount.textContent = String(list.length);
@@ -521,6 +547,73 @@ els.notifyBtn.addEventListener('click', async () => {
     showNote('通知がブロックされています。ブラウザ（端末）の設定で、このサイトの通知を許可してください。');
   }
 });
+
+// --- 履歴の編集・削除・手入力 ---
+function saveRecords(next, doneText) {
+  if (!storage.save(HISTORY_KEY, next)) {
+    showNote('履歴を保存できませんでした。ブラウザの設定を確認してください。');
+    return false;
+  }
+  records = next;
+  renderHistory();
+  if (doneText) showToast(doneText);
+  return true;
+}
+
+async function openRecordDialog(rec) {
+  // 選択肢: その試合のメンバー（当時の名前）＋登録中のメンバー
+  const choices = rec ? [...rec.members] : [];
+  for (const m of members) if (!choices.some((c) => c.id === m.id)) choices.push({ id: m.id, name: m.name });
+  const s = rec ? history.summarize(rec) : { my: 0, opp: 0 };
+  let note = '';
+  if (rec && rec.events.length > 0) {
+    const t = history.eventTotals(rec);
+    note = `得点の記録では ${t.my} - ${t.opp} です。スコアを変えると、手入力の修正として保存します。`;
+  }
+  const result = await recordDialog(rec, {
+    initial: { finishedAtMs: rec ? rec.finishedAtMs : Date.now(), my: s.my, opp: s.opp },
+    choices,
+    selected: rec ? rec.members.map((m) => m.id) : [...lineup],
+    maxMembers: membersLib.MAX_LINEUP,
+    maxScore: history.MAX_SCORE,
+    toInput: history.toLocalInput,
+    fromInput: history.fromLocalInput,
+    note,
+  });
+  if (!result) return;
+  if (result.action === 'delete') {
+    saveRecords(history.removeRecord(records, rec.id), '試合を削除しました');
+    return;
+  }
+  const picked = choices.filter((c) => result.memberIds.includes(c.id));
+  if (rec) {
+    const next = history.updateRecord(records, rec.id, {
+      finishedAtMs: result.finishedAtMs,
+      members: picked,
+      my: result.my,
+      opp: result.opp,
+    });
+    saveRecords(next, '試合を修正しました');
+  } else {
+    const created = history.createManualRecord({
+      id: history.nextRecordId(records, Date.now()),
+      finishedAtMs: result.finishedAtMs,
+      my: result.my,
+      opp: result.opp,
+      members: picked,
+    });
+    saveRecords(history.addRecord(records, created), `試合を追加しました（${result.my} - ${result.opp}）`);
+  }
+}
+
+els.historyList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-edit-record');
+  if (!btn) return;
+  const rec = records.find((r) => r.id === btn.dataset.id);
+  if (rec) openRecordDialog(rec);
+});
+
+els.addRecord.addEventListener('click', () => openRecordDialog(null));
 
 // --- メンバー ---
 els.lineupChips.addEventListener('click', (e) => {

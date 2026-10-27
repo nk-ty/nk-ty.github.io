@@ -313,3 +313,87 @@ export function memberDialog(member, { validate, maxLen }) {
     );
   });
 }
+
+// 終了した試合の編集・手入力ダイアログ。
+// record が null なら新規（手入力）。choices は選べるメンバー [{id,name}]、selected は選択済み id。
+// 戻り値: { action: 'save', finishedAtMs, my, opp, memberIds } | { action: 'delete' } | null
+export function recordDialog(record, { initial, choices, selected, maxMembers, maxScore, toInput, fromInput, note }) {
+  return openDialog((finish) => {
+    const when = el('input', { type: 'datetime-local', value: toInput(initial.finishedAtMs) });
+    when.setAttribute('aria-label', '日時');
+    const my = numberField('自チーム', initial.my, maxScore);
+    const opp = numberField('相手', initial.opp, maxScore);
+    const error = el('p', { className: 'dlg-error', hidden: true, role: 'alert' });
+
+    // メンバー（上限まで）
+    let picked = [...selected];
+    const chipWrap = el('div', { className: 'chips' });
+    const renderChips = () => {
+      const full = picked.length >= maxMembers;
+      chipWrap.replaceChildren(
+        ...choices.map((m) => {
+          const on = picked.includes(m.id);
+          const b = el('button', { type: 'button', className: 'chip', textContent: m.name, disabled: full && !on });
+          b.dataset.id = m.id;
+          b.setAttribute('aria-pressed', String(on));
+          b.addEventListener('click', () => {
+            picked = on ? picked.filter((x) => x !== m.id) : [...picked, m.id];
+            renderChips();
+          });
+          return b;
+        }),
+      );
+    };
+    renderChips();
+
+    const save = () => {
+      const at = fromInput(when.value);
+      const a = Number(my.input.value);
+      const b = Number(opp.input.value);
+      const okScore = (raw, n) => raw !== '' && Number.isInteger(n) && n >= 0 && n <= maxScore;
+      if (at === null) {
+        error.textContent = '日時を入力してください';
+      } else if (!okScore(my.input.value, a) || !okScore(opp.input.value, b)) {
+        error.textContent = `得点は 0〜${maxScore} の整数で入力してください`;
+      } else {
+        finish({ action: 'save', finishedAtMs: at, my: a, opp: b, memberIds: picked });
+        return;
+      }
+      error.hidden = false;
+    };
+
+    let del = null;
+    if (record) {
+      let armed = false;
+      del = button('この試合を削除', 'btn-danger-ghost', 'delete', () => {
+        if (!armed) {
+          armed = true;
+          del.textContent = 'もう一度タップで削除';
+          return;
+        }
+        finish({ action: 'delete' });
+      });
+    }
+
+    const field = (label, ...children) =>
+      el('div', { className: 'dlg-field' }, el('p', { className: 'dlg-label', textContent: label }), ...children);
+
+    return el(
+      'div',
+      { className: 'dlg-body' },
+      el('h2', { className: 'dlg-title', textContent: record ? '試合を編集' : '試合を手入力' }),
+      field('日時', el('label', { className: 'text-field' }, when)),
+      field('スコア', el('div', { className: 'num-row score-inputs' }, my.node, opp.node)),
+      ...(note ? [el('p', { className: 'dlg-note', textContent: note })] : []),
+      field(`メンバー（最大${maxMembers}人）`, choices.length > 0 ? chipWrap : el('p', { className: 'dlg-note', textContent: 'メンバーは「メンバー」タブで登録できます' })),
+      error,
+      el(
+        'div',
+        { className: 'dlg-actions' },
+        button('キャンセル', 'btn-ghost', 'cancel', () => finish(null)),
+        button('保存', 'btn-primary', 'save', save),
+      ),
+      ...(del ? [del] : []),
+    );
+  });
+}
