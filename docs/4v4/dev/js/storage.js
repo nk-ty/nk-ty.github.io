@@ -1,7 +1,7 @@
 // 端末内保存（localStorage）の薄いラッパー。
 // 容量超過・プライベートモード等で例外になってもアプリが落ちないようにする。
 
-import { currentEnv, storagePrefix } from './env.js?v=9d84e60';
+import { currentEnv, storagePrefix } from './env.js?v=9163ef0';
 
 // 環境(本番/dev)ごとに接頭辞を分け、同一オリジンでもデータが混ざらないようにする。
 const PREFIX = storagePrefix(currentEnv());
