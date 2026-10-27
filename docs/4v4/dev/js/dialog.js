@@ -191,7 +191,7 @@ export function durationDialog(currentMinutes, { min, max, presets }) {
       el('h2', { className: 'dlg-title', textContent: '試合時間' }),
       el('p', {
         className: 'dlg-msg',
-        textContent: '分単位で設定します。残り時間が0になったら、超過した時間を表示しながら計時を続けます。',
+        textContent: '分単位で設定します。残り時間が0になったら、超過した時間を表示しながらタイマーを進めます。',
       }),
       presetRow,
       el('div', { className: 'dlg-field' }, el('div', { className: 'num-row' }, field.node)),
@@ -243,7 +243,7 @@ export function swapDialog(currentMinutes, { max, presets, warnSec }) {
       el('h2', { className: 'dlg-title', textContent: '交代の通知' }),
       el('p', {
         className: 'dlg-msg',
-        textContent: `計時中、交代の${warnSec}秒前と交代の時刻に、音・振動・画面表示で知らせます。\n例: 5分ごと → 4:45 と 5:00、9:45 と 10:00 …（試合開始からの時間）`,
+        textContent: `タイマーが動いている間、交代の${warnSec}秒前と交代の時刻に、音・振動・画面表示で知らせます。\n例: 5分ごと → 4:45 と 5:00、9:45 と 10:00 …（試合開始からの時間）`,
       }),
       presetRow,
       el('div', { className: 'dlg-field' }, el('div', { className: 'num-row' }, field.node)),

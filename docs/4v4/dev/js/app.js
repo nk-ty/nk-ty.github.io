@@ -1,16 +1,16 @@
-import * as sw from './stopwatch.js?v=bc4b2ea';
-import * as match from './match.js?v=bc4b2ea';
-import * as history from './history.js?v=bc4b2ea';
-import * as settingsLib from './settings.js?v=bc4b2ea';
-import * as storage from './storage.js?v=bc4b2ea';
-import * as wakeLock from './wakelock.js?v=bc4b2ea';
-import * as membersLib from './members.js?v=bc4b2ea';
-import * as teamsLib from './teams.js?v=bc4b2ea';
-import * as setupLib from './setup.js?v=bc4b2ea';
-import * as alerts from './alerts.js?v=bc4b2ea';
-import * as notify from './notify.js?v=bc4b2ea';
-import { currentEnv, DEV } from './env.js?v=bc4b2ea';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=bc4b2ea';
+import * as sw from './stopwatch.js?v=1e8de76';
+import * as match from './match.js?v=1e8de76';
+import * as history from './history.js?v=1e8de76';
+import * as settingsLib from './settings.js?v=1e8de76';
+import * as storage from './storage.js?v=1e8de76';
+import * as wakeLock from './wakelock.js?v=1e8de76';
+import * as membersLib from './members.js?v=1e8de76';
+import * as teamsLib from './teams.js?v=1e8de76';
+import * as setupLib from './setup.js?v=1e8de76';
+import * as alerts from './alerts.js?v=1e8de76';
+import * as notify from './notify.js?v=1e8de76';
+import { currentEnv, DEV } from './env.js?v=1e8de76';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=1e8de76';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
@@ -79,7 +79,7 @@ const els = {
 
 function statusLabel(over) {
   if (state.status === sw.IDLE) return '待機中';
-  if (state.status === sw.RUNNING) return over ? '時間超過' : '計時中';
+  if (state.status === sw.RUNNING) return over ? '時間超過' : '試合中';
   return over ? '一時停止中（時間超過）' : '一時停止中';
 }
 
@@ -474,7 +474,7 @@ async function syncRuntime() {
     startTicking();
     const ok = await wakeLock.acquire();
     if (!ok && !wakeLock.isSupported()) {
-      showNote('この端末では画面の自動消灯を防げません。計時中は画面を点灯したままにしてください。');
+      showNote('この端末では画面の自動消灯を防げません。試合中は画面を点灯したままにしてください。');
     }
   } else {
     stopTicking();
