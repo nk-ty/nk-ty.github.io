@@ -8,7 +8,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="manifest" href="manifest.webmanifest" id="manifest-link">
-  <link rel="stylesheet" href="css/style.css?v=1e8de76">
+  <link rel="stylesheet" href="css/style.css?v=9555132">
 </head>
 <body>
   <div id="app">
@@ -111,8 +111,21 @@
       </div>
 
       <div id="view-history" hidden>
+        <section class="card stats" aria-label="成績" id="stats-card" hidden>
+          <h2>成績</h2>
+          <p class="stats-overall" id="stats-overall"></p>
+          <div class="stats-teams" id="stats-teams">
+            <div class="stats-head" aria-hidden="true">
+              <span>チーム</span><span>試合</span><span>勝</span><span>分</span><span>敗</span><span>得失点</span>
+            </div>
+            <div id="stats-rows"></div>
+            <p class="hint stats-hint">チームをタップすると、そのチームの試合だけ表示します</p>
+          </div>
+        </section>
+
         <section class="card history" aria-label="終了した試合">
           <h2>終了した試合</h2>
+          <button type="button" class="filter-chip" id="filter-clear" hidden></button>
           <ol class="history-list" id="history-list"></ol>
           <p class="empty" id="history-empty">まだ終了した試合はありません</p>
           <button type="button" class="btn btn-ghost btn-block" id="btn-add-record">試合を手入力</button>
@@ -132,6 +145,6 @@
   <button type="button" class="swap-alert" id="swap-alert" hidden></button>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script type="module" src="js/app.js?v=1e8de76"></script>
+  <script type="module" src="js/app.js?v=9555132"></script>
 </body>
 </html>

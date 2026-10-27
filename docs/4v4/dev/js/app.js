@@ -1,16 +1,17 @@
-import * as sw from './stopwatch.js?v=1e8de76';
-import * as match from './match.js?v=1e8de76';
-import * as history from './history.js?v=1e8de76';
-import * as settingsLib from './settings.js?v=1e8de76';
-import * as storage from './storage.js?v=1e8de76';
-import * as wakeLock from './wakelock.js?v=1e8de76';
-import * as membersLib from './members.js?v=1e8de76';
-import * as teamsLib from './teams.js?v=1e8de76';
-import * as setupLib from './setup.js?v=1e8de76';
-import * as alerts from './alerts.js?v=1e8de76';
-import * as notify from './notify.js?v=1e8de76';
-import { currentEnv, DEV } from './env.js?v=1e8de76';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=1e8de76';
+import * as sw from './stopwatch.js?v=9555132';
+import * as match from './match.js?v=9555132';
+import * as history from './history.js?v=9555132';
+import * as settingsLib from './settings.js?v=9555132';
+import * as storage from './storage.js?v=9555132';
+import * as wakeLock from './wakelock.js?v=9555132';
+import * as membersLib from './members.js?v=9555132';
+import * as teamsLib from './teams.js?v=9555132';
+import * as setupLib from './setup.js?v=9555132';
+import * as stats from './stats.js?v=9555132';
+import * as alerts from './alerts.js?v=9555132';
+import * as notify from './notify.js?v=9555132';
+import { currentEnv, DEV } from './env.js?v=9555132';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=9555132';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
@@ -70,6 +71,11 @@ const els = {
   membersCount: $('members-count'),
   addMember: $('btn-add-member'),
   addRecord: $('btn-add-record'),
+  statsCard: $('stats-card'),
+  statsOverall: $('stats-overall'),
+  statsTeams: $('stats-teams'),
+  statsRows: $('stats-rows'),
+  filterClear: $('filter-clear'),
   tabs: document.querySelectorAll('.tab'),
   historyList: $('history-list'),
   historyEmpty: $('history-empty'),
@@ -97,6 +103,8 @@ let teams = teamsLib.sanitize(storage.load(TEAMS_KEY, null), members);
 let setup = setupLib.sanitize(storage.load(SETUP_KEY, null), members, teams, storage.load(LINEUP_KEY, null));
 // チームを選んだ側でも、チーム外のメンバーを選べるようにする表示切り替え（保存しない）
 const showAll = { my: false, opp: false };
+// 履歴の絞り込み（チームの key。null なら全試合）。保存しない
+let historyFilter = null;
 
 function sideTeam(side) {
   return teamsLib.findTeam(teams, setup[side].teamId);
@@ -353,7 +361,11 @@ function saveMembers() {
 }
 
 function buildMatchItem(rec) {
-  const s = history.summarize(rec);
+  const base = history.summarize(rec);
+  // チームで絞り込み中は、そのチームから見た結果・スコアで表示する（相手側で出た試合は左右を入れ替える）
+  const flip = historyFilter !== null && rec.oppTeam?.id === historyFilter && rec.myTeam?.id !== historyFilter;
+  const FLIP_RESULT = { win: 'loss', loss: 'win', draw: 'draw' };
+  const s = flip ? { my: base.opp, opp: base.my, result: FLIP_RESULT[base.result] } : base;
   const li = document.createElement('li');
   const details = document.createElement('details');
   details.className = 'match';
@@ -369,7 +381,7 @@ function buildMatchItem(rec) {
   );
   const myName = rec.myTeam?.name ?? DEFAULT_SIDE_NAME.my;
   const oppName = rec.oppTeam?.name ?? DEFAULT_SIDE_NAME.opp;
-  if (rec.myTeam || rec.oppTeam) summary.append(span('match-teams', `${myName} vs ${oppName}`));
+  if (rec.myTeam || rec.oppTeam) summary.append(span('match-teams', flip ? `${oppName} vs ${myName}` : `${myName} vs ${oppName}`));
   // 両側の区別が要るときだけ、名前の前にチーム名を付ける
   const labeled = Boolean(rec.myTeam || rec.oppTeam || rec.oppMembers.length > 0);
   const memberLine = (className, list, prefix) => {
@@ -419,8 +431,53 @@ function buildMatchItem(rec) {
   return li;
 }
 
+function pct(rate) {
+  return rate === null ? '—' : `${Math.round(rate * 100)}%`;
+}
+
+function renderStats() {
+  els.statsCard.hidden = records.length === 0;
+  if (records.length === 0) return;
+  const o = stats.overall(records);
+  els.statsOverall.textContent =
+    `通算 ${o.played}試合　${o.win}勝 ${o.draw}分 ${o.loss}敗（勝率 ${pct(stats.winRate(o))}）\n` +
+    `得点 ${o.pf}　失点 ${o.pa}`;
+  const rows = stats.byTeam(records);
+  // チームを使っていないときは、チーム別の表を出さない
+  els.statsTeams.hidden = rows.every((r) => r.key === stats.NO_TEAM);
+  els.statsRows.replaceChildren(
+    ...rows.map((r) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'stats-row';
+      b.dataset.key = r.key;
+      b.setAttribute('aria-pressed', String(historyFilter === r.key));
+      b.setAttribute('aria-label', `${r.name} ${r.played}試合 ${r.win}勝 ${r.draw}分 ${r.loss}敗。タップでこのチームの試合だけ表示`);
+      const diff = r.pf - r.pa;
+      b.append(
+        span('st-name', r.name),
+        span('st-num', String(r.played)),
+        span('st-num st-win', String(r.win)),
+        span('st-num', String(r.draw)),
+        span('st-num st-loss', String(r.loss)),
+        span('st-num', diff > 0 ? `+${diff}` : String(diff)),
+      );
+      return b;
+    }),
+  );
+}
+
+function filterName(key) {
+  return stats.byTeam(records).find((r) => r.key === key)?.name ?? '';
+}
+
 function renderHistory() {
-  const list = history.newestFirst(records);
+  // 絞り込み中のチームの試合がなくなったら解除する
+  if (historyFilter !== null && stats.filterByTeam(records, historyFilter).length === 0) historyFilter = null;
+  renderStats();
+  els.filterClear.hidden = historyFilter === null;
+  if (historyFilter !== null) els.filterClear.textContent = `${filterName(historyFilter)} の試合のみ　✕ 解除`;
+  const list = history.newestFirst(historyFilter === null ? records : stats.filterByTeam(records, historyFilter));
   // 編集後も、開いていた試合は開いたままにする
   const open = new Set([...els.historyList.querySelectorAll('details[open]')].map((d) => d.dataset.id));
   els.historyList.replaceChildren(
@@ -431,8 +488,9 @@ function renderHistory() {
     }),
   );
   els.historyEmpty.hidden = list.length > 0;
-  els.historyCount.hidden = list.length === 0;
-  els.historyCount.textContent = String(list.length);
+  // タブの件数は絞り込みに関係なく全試合数
+  els.historyCount.hidden = records.length === 0;
+  els.historyCount.textContent = String(records.length);
 }
 
 function render() {
@@ -730,6 +788,19 @@ els.historyList.addEventListener('click', (e) => {
 });
 
 els.addRecord.addEventListener('click', () => openRecordDialog(null));
+
+// 成績の行をタップして、そのチームの試合だけに絞り込む（もう一度タップで解除）
+els.statsRows.addEventListener('click', (e) => {
+  const row = e.target.closest('.stats-row');
+  if (!row) return;
+  historyFilter = historyFilter === row.dataset.key ? null : row.dataset.key;
+  renderHistory();
+});
+
+els.filterClear.addEventListener('click', () => {
+  historyFilter = null;
+  renderHistory();
+});
 
 // --- 出場チーム・メンバー（試合画面） ---
 function saveSetup() {
