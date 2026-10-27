@@ -656,3 +656,46 @@ body {
 .dlg-error[hidden] {
   display: none;
 }
+
+/* カウントダウン: 試合時間ボタン・超過表示 */
+.btn-duration {
+  display: block;
+  margin: -4px auto 12px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-duration[hidden] {
+  display: none;
+}
+
+.btn-duration:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+/* 試合時間を過ぎたら色を変える（計時中・一時停止中とも） */
+.stopwatch[data-over="true"] .clock {
+  color: var(--loss);
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.btn-preset {
+  flex: 1 0 28%;
+  min-height: 48px;
+  font-size: 1rem;
+}

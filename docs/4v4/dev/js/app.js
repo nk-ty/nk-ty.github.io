@@ -1,14 +1,17 @@
 import * as sw from './stopwatch.js';
 import * as match from './match.js';
 import * as history from './history.js';
+import * as settingsLib from './settings.js';
 import * as storage from './storage.js';
 import * as wakeLock from './wakelock.js';
 import { currentEnv, DEV } from './env.js';
-import { confirmDialog, editEventDialog } from './dialog.js';
+import { confirmDialog, editEventDialog, durationDialog } from './dialog.js';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
 const HISTORY_KEY = 'history';
+const SETTINGS_KEY = 'settings';
+const DURATION_PRESETS = [5, 8, 10, 12, 15, 20];
 const TICK_MS = 250; // 表示更新の間隔。経過時間そのものは時刻差から算出する
 const TOAST_MS = 3500;
 
@@ -22,6 +25,7 @@ const els = {
   pause: $('btn-pause'),
   resume: $('btn-resume'),
   reset: $('btn-reset'),
+  duration: $('btn-duration'),
   finish: $('btn-finish'),
   wakeNote: $('wake-note'),
   scoreMy: $('score-my'),
@@ -40,11 +44,11 @@ const els = {
   toast: $('toast'),
 };
 
-const STATUS_LABEL = {
-  [sw.IDLE]: '待機中',
-  [sw.RUNNING]: '計時中',
-  [sw.PAUSED]: '一時停止中',
-};
+function statusLabel(over) {
+  if (state.status === sw.IDLE) return '待機中';
+  if (state.status === sw.RUNNING) return over ? '時間超過' : '計時中';
+  return over ? '一時停止中（時間超過）' : '一時停止中';
+}
 
 const TEAM_LABEL = { [match.MY]: '自', [match.OPP]: '相手' };
 const TEAM_NAME = { my: '自チーム', opp: '相手' };
@@ -53,6 +57,9 @@ const RESULT_LABEL = { win: '勝ち', draw: '引き分け', loss: '負け' };
 let state = sw.sanitize(storage.load(SW_KEY, null));
 let game = match.sanitize(storage.load(MATCH_KEY, null));
 let records = history.sanitize(storage.load(HISTORY_KEY, null));
+let settings = settingsLib.sanitize(storage.load(SETTINGS_KEY, null));
+// 試合時間を過ぎた瞬間にだけ知らせるため、前回の表示が超過だったかを覚えておく
+let overShown = sw.isOvertime(sw.remainingMs(state, Date.now(), settings.matchSec));
 let timerId = null;
 let toastTimer = null;
 
@@ -92,14 +99,26 @@ function eventSpans(e) {
   ];
 }
 
+// カウントダウン表示。試合時間を過ぎたら「+mm:ss」で超過時間を表示し、計時は続ける
 function renderClock() {
-  els.clock.textContent = sw.formatClock(sw.elapsedMs(state, Date.now()));
+  const remaining = sw.remainingMs(state, Date.now(), settings.matchSec);
+  const over = sw.isOvertime(remaining);
+  els.clock.textContent = sw.formatCountdown(remaining);
+  els.card.dataset.over = String(over);
+  els.status.textContent = statusLabel(over);
+  // 計時中に試合時間が0を過ぎたときだけ、短く振動で知らせる
+  if (over && !overShown && state.status === sw.RUNNING && navigator.vibrate) {
+    navigator.vibrate([200, 100, 200]);
+  }
+  overShown = over;
 }
 
 function renderStopwatch() {
   const hasScores = game.events.length > 0;
   els.card.dataset.status = state.status;
-  els.status.textContent = STATUS_LABEL[state.status];
+  // 計時中は誤タップ防止のため、試合時間の変更を出さない
+  els.duration.hidden = state.status === sw.RUNNING;
+  els.duration.textContent = `試合時間 ${settingsLib.matchMinutes(settings)}分`;
   els.start.hidden = state.status !== sw.IDLE;
   els.pause.hidden = state.status !== sw.RUNNING;
   els.resume.hidden = state.status !== sw.PAUSED;
@@ -239,11 +258,28 @@ els.resume.addEventListener('click', () => apply(sw.resume(state, Date.now())));
 els.reset.addEventListener('click', async () => {
   const ok = await confirmDialog({
     title: 'リセットしますか？',
-    message: 'ストップウォッチと得点をすべてリセットします。\n履歴には保存されません。',
+    message: 'タイマーと得点をすべてリセットします。\n履歴には保存されません。',
     okLabel: 'リセット',
     danger: true,
   });
   if (ok) apply(sw.reset(), match.initialMatch());
+});
+
+// --- 試合時間の変更 ---
+els.duration.addEventListener('click', async () => {
+  const result = await durationDialog(settingsLib.matchMinutes(settings), {
+    min: settingsLib.MIN_MINUTES,
+    max: settingsLib.MAX_MINUTES,
+    presets: DURATION_PRESETS,
+  });
+  if (!result) return;
+  const next = settingsLib.setMatchMinutes(settings, result.minutes);
+  if (next === settings) return;
+  settings = next;
+  if (!storage.save(SETTINGS_KEY, settings)) showNote('試合時間を保存できませんでした。');
+  // 設定変更で超過の状態が切り替わっても、振動させない
+  overShown = sw.isOvertime(sw.remainingMs(state, Date.now(), settings.matchSec));
+  render();
 });
 
 // --- 試合終了 → 履歴に保存 ---
@@ -254,12 +290,15 @@ els.finish.addEventListener('click', async () => {
   const events = game.events;
   const t = match.totals(game);
   const label = RESULT_LABEL[match.result(t)];
+  const extra = durationSec - settings.matchSec;
+  const timeText =
+    sw.formatClock(durationSec * 1000) + (extra > 0 ? `（延長 +${sw.formatClock(extra * 1000)}）` : '');
 
   const ok = await confirmDialog({
     title: '試合を終了しますか？',
     message:
       `最終スコア　自チーム ${t.my} - ${t.opp} 相手（${label}）\n` +
-      `試合時間　${sw.formatClock(durationSec * 1000)}\n` +
+      `試合時間　${timeText}\n` +
       `得点　${events.length}件\n\n` +
       '履歴に保存して、新しい試合を始められる状態にします。',
     okLabel: '終了して保存',

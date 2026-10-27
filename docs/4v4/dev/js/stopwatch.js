@@ -51,6 +51,27 @@ export function formatClock(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// 残り時間（ミリ秒）。試合時間を過ぎると負の値になる。
+export function remainingMs(state, nowMs, durationSec) {
+  return durationSec * 1000 - elapsedMs(state, nowMs);
+}
+
+// カウントダウン表示。
+//   残りがある間: 切り上げた「10:00」→「00:01」（開始直後も 10:00 のまま見える）
+//   ちょうど 0 : 「00:00」
+//   超過       : 「+00:01」のように、超過した時間を切り捨てで表示
+export function formatCountdown(remaining) {
+  if (!Number.isFinite(remaining)) return formatClock(0);
+  if (remaining > 0) return formatClock(Math.ceil(remaining / 1000) * 1000);
+  if (remaining === 0) return formatClock(0);
+  return `+${formatClock(-remaining)}`;
+}
+
+// 試合時間を過ぎているか（ちょうど 0 は超過ではない）。
+export function isOvertime(remaining) {
+  return Number.isFinite(remaining) && remaining < 0;
+}
+
 // 得点タイムライン用の「3'24"」形式（秒入力）。
 export function formatMarker(sec) {
   const total = Math.max(0, Math.floor(sec));

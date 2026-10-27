@@ -16,9 +16,10 @@
     <main>
       <!-- 試合（ライブ入力） -->
       <div id="view-live">
-        <section class="card stopwatch" aria-label="ストップウォッチ">
+        <section class="card stopwatch" aria-label="タイマー">
           <p class="status" id="sw-status" aria-live="polite">待機中</p>
-          <p class="clock" id="sw-clock" role="timer" aria-live="off">00:00</p>
+          <p class="clock" id="sw-clock" role="timer" aria-live="off">10:00</p>
+          <button type="button" class="btn-duration" id="btn-duration">試合時間 10分</button>
 
           <div class="controls">
             <button type="button" class="btn btn-primary" id="btn-start">開始</button>
@@ -51,7 +52,7 @@
             </div>
           </div>
 
-          <p class="note" id="idle-note" hidden>ストップウォッチ開始前の得点は 0'00" として記録されます。</p>
+          <p class="note" id="idle-note" hidden>タイマー開始前の得点は 0'00" として記録されます。</p>
           <button type="button" class="btn btn-ghost btn-undo" id="btn-undo" disabled>直前の得点を取り消す</button>
         </section>
 

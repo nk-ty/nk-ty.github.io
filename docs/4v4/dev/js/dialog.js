@@ -152,3 +152,56 @@ export function editEventDialog(ev, teamLabels) {
     );
   });
 }
+
+// 試合時間（分）の設定ダイアログ。
+// 戻り値: { minutes } | null（キャンセル）
+export function durationDialog(currentMinutes, { min, max, presets }) {
+  return openDialog((finish) => {
+    const field = numberField('分', currentMinutes, max);
+    field.input.min = String(min);
+    const error = el('p', { className: 'dlg-error', hidden: true, role: 'alert' });
+
+    const presetRow = el(
+      'div',
+      { className: 'preset-row' },
+      ...presets.map((m) => {
+        const b = button(`${m}分`, 'btn-ghost btn-preset', 'preset', () => {
+          field.input.value = String(m);
+          error.hidden = true;
+        });
+        b.dataset.minutes = String(m);
+        return b;
+      }),
+    );
+
+    const save = () => {
+      const raw = field.input.value;
+      const m = Number(raw);
+      if (raw === '' || !Number.isInteger(m) || m < min || m > max) {
+        error.textContent = `試合時間は ${min}〜${max} 分の整数で入力してください`;
+        error.hidden = false;
+        return;
+      }
+      finish({ minutes: m });
+    };
+
+    return el(
+      'div',
+      { className: 'dlg-body' },
+      el('h2', { className: 'dlg-title', textContent: '試合時間' }),
+      el('p', {
+        className: 'dlg-msg',
+        textContent: '分単位で設定します。残り時間が0になったら、超過した時間を表示しながら計時を続けます。',
+      }),
+      presetRow,
+      el('div', { className: 'dlg-field' }, el('div', { className: 'num-row' }, field.node)),
+      error,
+      el(
+        'div',
+        { className: 'dlg-actions' },
+        button('キャンセル', 'btn-ghost', 'cancel', () => finish(null)),
+        button('保存', 'btn-primary', 'save', save),
+      ),
+    );
+  });
+}
