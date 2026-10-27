@@ -12,6 +12,10 @@
   --my-text: #04203a;
   --opp: #ff7a6b;
   --opp-text: #3a0a05;
+  --danger: #ff5d5d;
+  --danger-text: #2a0505;
+  --win: #2fd27a;
+  --loss: #ff7a6b;
   --radius: 16px;
 }
 
@@ -37,7 +41,7 @@ body {
 #app {
   max-width: 480px;
   margin: 0 auto;
-  padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+  padding: env(safe-area-inset-top) 16px calc(88px + env(safe-area-inset-bottom));
 }
 
 .app-header h1 {
@@ -294,5 +298,361 @@ body {
 }
 
 .empty[hidden] {
+  display: none;
+}
+
+/* 試合終了ボタン */
+.btn-finish {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 12px;
+  font-size: 1rem;
+}
+
+.btn-finish[hidden] {
+  display: none;
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: var(--danger-text);
+}
+
+.btn-danger-ghost {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  background: transparent;
+  color: var(--danger);
+  border: 2px solid var(--danger);
+  font-size: 1rem;
+}
+
+/* タイムラインの行（タップで修正） */
+.timeline h2 .hint {
+  margin-left: 6px;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.timeline-list li {
+  display: block;
+  padding: 0;
+}
+
+.tl-row {
+  display: grid;
+  grid-template-columns: 4.5rem 3.2rem 2.5rem 1fr;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tl-row:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tl-row:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -3px;
+}
+
+/* 履歴 */
+.history h2 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.match {
+  border-top: 1px solid var(--border);
+}
+
+.history-list li:first-child .match {
+  border-top: 0;
+}
+
+.match summary {
+  display: grid;
+  grid-template-columns: 5.2rem 3.4rem 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 60px;
+  padding: 8px 0;
+  list-style: none;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.match summary::-webkit-details-marker {
+  display: none;
+}
+
+.match-date {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.match-result {
+  padding: 2px 0;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.res-win {
+  background: var(--win);
+  color: var(--primary-text);
+}
+
+.res-loss {
+  background: var(--loss);
+  color: var(--opp-text);
+}
+
+.res-draw {
+  background: var(--border);
+  color: var(--text);
+}
+
+.match-score {
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.match-time {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.match-events {
+  margin: 0 0 8px;
+  padding: 0 0 0 8px;
+  list-style: none;
+}
+
+.match-events li {
+  display: grid;
+  grid-template-columns: 4.5rem 3.2rem 2.5rem 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.match-events .tl-empty {
+  display: block;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* 下部タブバー */
+.tabbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tabbar-inner {
+  display: flex;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.tab {
+  flex: 1;
+  min-height: 60px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab[aria-current="page"] {
+  color: var(--text);
+  box-shadow: inset 0 3px 0 var(--primary);
+}
+
+.tab:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -3px;
+}
+
+.tab-count {
+  display: inline-block;
+  min-width: 1.4em;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.tab-count[hidden] {
+  display: none;
+}
+
+/* トースト */
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  left: 16px;
+  max-width: 448px;
+  margin: 0 auto;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
+  text-align: center;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+/* ダイアログ */
+.dlg {
+  width: min(92vw, 420px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.dlg::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.dlg-body {
+  padding: 20px 16px 16px;
+}
+
+.dlg-title {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+}
+
+.dlg-msg {
+  margin: 0 0 20px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.dlg-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.dlg-actions .btn {
+  min-height: 60px;
+}
+
+.dlg-field {
+  margin-bottom: 16px;
+}
+
+.dlg-label {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.seg-group {
+  display: flex;
+  gap: 8px;
+}
+
+.seg {
+  position: relative;
+  flex: 1;
+}
+
+.seg input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+}
+
+.seg span {
+  display: block;
+  padding: 14px 0;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.seg input:checked + span {
+  border-color: var(--primary);
+  background: rgba(47, 210, 122, 0.15);
+}
+
+.seg input:focus-visible + span {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.num-row {
+  display: flex;
+  gap: 12px;
+}
+
+.num {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+}
+
+.num input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 8px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.dlg-error {
+  margin: 0 0 12px;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.dlg-error[hidden] {
   display: none;
 }

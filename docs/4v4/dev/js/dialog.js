@@ -1,0 +1,154 @@
+// アプリ内ダイアログ（<dialog>）。window.confirm の代わりに使う。
+// 外側タップ・Escで閉じると「キャンセル」扱い。
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    // role は古いブラウザでプロパティ反映がないため属性で設定する
+    if (key === 'role') node.setAttribute('role', value);
+    else node[key] = value;
+  }
+  node.append(...children);
+  return node;
+}
+
+function openDialog(build) {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'dlg';
+    let result = null;
+    const finish = (value) => {
+      result = value;
+      dlg.close();
+    };
+    dlg.append(build(finish));
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg) finish(null); // 背景タップ
+    });
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      resolve(result);
+    });
+    document.body.append(dlg);
+    dlg.showModal();
+  });
+}
+
+function button(label, className, action, onClick) {
+  const b = el('button', { type: 'button', className: `btn ${className}`, textContent: label });
+  b.dataset.action = action;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+// 確認ダイアログ。OKなら true、キャンセル・外側タップなら false。
+export function confirmDialog({ title, message, okLabel = 'OK', cancelLabel = 'キャンセル', danger = false }) {
+  return openDialog((finish) => {
+    const actions = el(
+      'div',
+      { className: 'dlg-actions' },
+      button(cancelLabel, 'btn-ghost', 'cancel', () => finish(null)),
+      button(okLabel, danger ? 'btn-danger' : 'btn-primary', 'ok', () => finish('ok')),
+    );
+    return el(
+      'div',
+      { className: 'dlg-body', role: 'document' },
+      el('h2', { className: 'dlg-title', textContent: title }),
+      el('p', { className: 'dlg-msg', textContent: message }),
+      actions,
+    );
+  }).then((v) => v === 'ok');
+}
+
+function segmented(name, options, value) {
+  const wrap = el('div', { className: 'seg-group', role: 'radiogroup' });
+  for (const [val, label] of options) {
+    const input = el('input', { type: 'radio', name, value: String(val), checked: String(val) === String(value) });
+    wrap.append(el('label', { className: 'seg' }, input, el('span', { textContent: label })));
+  }
+  return wrap;
+}
+
+function numberField(label, value, max) {
+  const input = el('input', {
+    type: 'number',
+    inputMode: 'numeric',
+    min: '0',
+    max: String(max),
+    value: String(value),
+  });
+  input.setAttribute('aria-label', label);
+  return { input, node: el('label', { className: 'num' }, input, el('span', { textContent: label })) };
+}
+
+// 得点イベントの修正ダイアログ。
+// 戻り値: { action: 'save', team, points, elapsedSec } | { action: 'delete' } | null（キャンセル）
+export function editEventDialog(ev, teamLabels) {
+  return openDialog((finish) => {
+    const teamGroup = segmented('team', [['my', teamLabels.my], ['opp', teamLabels.opp]], ev.team);
+    const pointsGroup = segmented('points', [[2, '2点'], [3, '3点']], ev.points);
+    const min = numberField('分', Math.floor(ev.elapsedSec / 60), 999);
+    const sec = numberField('秒', ev.elapsedSec % 60, 59);
+    const error = el('p', { className: 'dlg-error', hidden: true, role: 'alert' });
+
+    const checked = (group) => group.querySelector('input:checked')?.value;
+
+    const save = () => {
+      const m = Number(min.input.value);
+      const s = Number(sec.input.value);
+      const valid =
+        min.input.value !== '' &&
+        sec.input.value !== '' &&
+        Number.isInteger(m) &&
+        Number.isInteger(s) &&
+        m >= 0 &&
+        m <= 999 &&
+        s >= 0 &&
+        s <= 59;
+      if (!valid) {
+        error.textContent = '時間は 分(0〜999)・秒(0〜59) の整数で入力してください';
+        error.hidden = false;
+        return;
+      }
+      finish({
+        action: 'save',
+        team: checked(teamGroup),
+        points: Number(checked(pointsGroup)),
+        elapsedSec: m * 60 + s,
+      });
+    };
+
+    // 削除は誤タップ防止のため2回タップで実行
+    let armed = false;
+    const del = button('削除', 'btn-danger-ghost', 'delete', () => {
+      if (!armed) {
+        armed = true;
+        del.textContent = 'もう一度タップで削除';
+        return;
+      }
+      finish({ action: 'delete' });
+    });
+
+    return el(
+      'div',
+      { className: 'dlg-body' },
+      el('h2', { className: 'dlg-title', textContent: '得点を修正' }),
+      el('div', { className: 'dlg-field' }, el('p', { className: 'dlg-label', textContent: 'チーム' }), teamGroup),
+      el('div', { className: 'dlg-field' }, el('p', { className: 'dlg-label', textContent: '点数' }), pointsGroup),
+      el(
+        'div',
+        { className: 'dlg-field' },
+        el('p', { className: 'dlg-label', textContent: '時間' }),
+        el('div', { className: 'num-row' }, min.node, sec.node),
+      ),
+      error,
+      el(
+        'div',
+        { className: 'dlg-actions' },
+        button('キャンセル', 'btn-ghost', 'cancel', () => finish(null)),
+        button('保存', 'btn-primary', 'save', save),
+      ),
+      del,
+    );
+  });
+}

@@ -14,51 +14,73 @@
     </header>
 
     <main>
-      <section class="card stopwatch" aria-label="ストップウォッチ">
-        <p class="status" id="sw-status" aria-live="polite">待機中</p>
-        <p class="clock" id="sw-clock" role="timer" aria-live="off">00:00</p>
+      <!-- 試合（ライブ入力） -->
+      <div id="view-live">
+        <section class="card stopwatch" aria-label="ストップウォッチ">
+          <p class="status" id="sw-status" aria-live="polite">待機中</p>
+          <p class="clock" id="sw-clock" role="timer" aria-live="off">00:00</p>
 
-        <div class="controls">
-          <button type="button" class="btn btn-primary" id="btn-start">開始</button>
-          <button type="button" class="btn btn-warn" id="btn-pause" hidden>一時停止</button>
-          <button type="button" class="btn btn-primary" id="btn-resume" hidden>再開</button>
-          <button type="button" class="btn btn-ghost" id="btn-reset" hidden>リセット</button>
-        </div>
+          <div class="controls">
+            <button type="button" class="btn btn-primary" id="btn-start">開始</button>
+            <button type="button" class="btn btn-warn" id="btn-pause" hidden>一時停止</button>
+            <button type="button" class="btn btn-primary" id="btn-resume" hidden>再開</button>
+            <button type="button" class="btn btn-ghost" id="btn-reset" hidden>リセット</button>
+          </div>
+          <button type="button" class="btn btn-ghost btn-finish" id="btn-finish" hidden>試合終了</button>
 
-        <p class="note" id="wake-note" hidden></p>
-      </section>
+          <p class="note" id="wake-note" hidden></p>
+        </section>
 
-      <section class="card scoreboard" aria-label="スコア">
-        <div class="teams">
-          <div class="team team-my">
-            <h2>自チーム</h2>
-            <p class="score" id="score-my" aria-live="polite">0</p>
-            <div class="score-btns">
-              <button type="button" class="btn btn-score" data-team="my" data-points="2" aria-label="自チーム 2点">+2</button>
-              <button type="button" class="btn btn-score" data-team="my" data-points="3" aria-label="自チーム 3点">+3</button>
+        <section class="card scoreboard" aria-label="スコア">
+          <div class="teams">
+            <div class="team team-my">
+              <h2>自チーム</h2>
+              <p class="score" id="score-my" aria-live="polite">0</p>
+              <div class="score-btns">
+                <button type="button" class="btn btn-score" data-team="my" data-points="2" aria-label="自チーム 2点">+2</button>
+                <button type="button" class="btn btn-score" data-team="my" data-points="3" aria-label="自チーム 3点">+3</button>
+              </div>
+            </div>
+            <div class="team team-opp">
+              <h2>相手</h2>
+              <p class="score" id="score-opp" aria-live="polite">0</p>
+              <div class="score-btns">
+                <button type="button" class="btn btn-score" data-team="opp" data-points="2" aria-label="相手 2点">+2</button>
+                <button type="button" class="btn btn-score" data-team="opp" data-points="3" aria-label="相手 3点">+3</button>
+              </div>
             </div>
           </div>
-          <div class="team team-opp">
-            <h2>相手</h2>
-            <p class="score" id="score-opp" aria-live="polite">0</p>
-            <div class="score-btns">
-              <button type="button" class="btn btn-score" data-team="opp" data-points="2" aria-label="相手 2点">+2</button>
-              <button type="button" class="btn btn-score" data-team="opp" data-points="3" aria-label="相手 3点">+3</button>
-            </div>
-          </div>
-        </div>
 
-        <p class="note" id="idle-note" hidden>ストップウォッチ開始前の得点は 0'00" として記録されます。</p>
-        <button type="button" class="btn btn-ghost btn-undo" id="btn-undo" disabled>直前の得点を取り消す</button>
-      </section>
+          <p class="note" id="idle-note" hidden>ストップウォッチ開始前の得点は 0'00" として記録されます。</p>
+          <button type="button" class="btn btn-ghost btn-undo" id="btn-undo" disabled>直前の得点を取り消す</button>
+        </section>
 
-      <section class="card timeline" aria-label="得点の履歴">
-        <h2>得点の履歴</h2>
-        <ol class="timeline-list" id="timeline"></ol>
-        <p class="empty" id="timeline-empty">まだ得点はありません</p>
-      </section>
+        <section class="card timeline" aria-label="得点の履歴">
+          <h2>得点の履歴 <span class="hint">行をタップして修正</span></h2>
+          <ol class="timeline-list" id="timeline"></ol>
+          <p class="empty" id="timeline-empty">まだ得点はありません</p>
+        </section>
+      </div>
+
+      <!-- 履歴（終了した試合） -->
+      <div id="view-history" hidden>
+        <section class="card history" aria-label="終了した試合">
+          <h2>終了した試合</h2>
+          <ol class="history-list" id="history-list"></ol>
+          <p class="empty" id="history-empty">まだ終了した試合はありません</p>
+        </section>
+      </div>
     </main>
   </div>
+
+  <nav class="tabbar" aria-label="画面の切り替え">
+    <div class="tabbar-inner">
+      <button type="button" class="tab" id="tab-live" data-view="live" aria-current="page">試合</button>
+      <button type="button" class="tab" id="tab-history" data-view="history">履歴 <span class="tab-count" id="history-count" hidden>0</span></button>
+    </div>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <script type="module" src="js/app.js"></script>
 </body>
