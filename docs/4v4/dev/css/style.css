@@ -1,0 +1,298 @@
+:root {
+  --bg: #0f1720;
+  --surface: #18222e;
+  --border: #2a3847;
+  --text: #f2f6fa;
+  --muted: #9fb0c0;
+  --primary: #2fd27a;
+  --primary-text: #05210f;
+  --warn: #ffb020;
+  --warn-text: #2b1b00;
+  --my: #4da3ff;
+  --my-text: #04203a;
+  --opp: #ff7a6b;
+  --opp-text: #3a0a05;
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  /* 二度押しでの拡大を防ぐ。コート脇の素早い連打対策 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+}
+
+.app-header h1 {
+  margin: 0;
+  padding: 16px 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.env-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border: 1.5px solid var(--warn);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--warn);
+  vertical-align: 1px;
+}
+
+.env-badge[hidden] {
+  display: none;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 16px 20px;
+}
+
+.card + .card {
+  margin-top: 12px;
+}
+
+.stopwatch {
+  text-align: center;
+}
+
+.status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.clock {
+  margin: 2px 0 12px;
+  font-size: clamp(3.5rem, 18vw, 5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.stopwatch[data-status="running"] .clock {
+  color: var(--primary);
+}
+
+.stopwatch[data-status="paused"] .clock {
+  color: var(--warn);
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  flex: 1;
+  min-height: 72px;
+  border: 0;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn[hidden] {
+  display: none;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn-warn {
+  background: var(--warn);
+  color: var(--warn-text);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--border);
+}
+
+.note {
+  margin: 16px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.note[hidden] {
+  display: none;
+}
+
+/* スコアボード */
+.teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.team {
+  text-align: center;
+}
+
+.team h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.team-my h2,
+.team-my .score {
+  color: var(--my);
+}
+
+.team-opp h2,
+.team-opp .score {
+  color: var(--opp);
+}
+
+.score {
+  margin: 0 0 8px;
+  font-size: clamp(3.5rem, 18vw, 5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-score {
+  min-height: 72px;
+  font-size: 1.6rem;
+}
+
+.team-my .btn-score {
+  background: var(--my);
+  color: var(--my-text);
+}
+
+.team-opp .btn-score {
+  background: var(--opp);
+  color: var(--opp-text);
+}
+
+.btn-undo {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 16px;
+  font-size: 1rem;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn:disabled:active {
+  transform: none;
+}
+
+/* 得点の履歴 */
+.timeline h2 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.timeline-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-list li {
+  display: grid;
+  grid-template-columns: 4.5rem 3.2rem 2.5rem 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-list li:first-child {
+  border-top: 0;
+}
+
+.tl-time {
+  font-weight: 700;
+}
+
+.tl-team {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.tl-points {
+  font-weight: 800;
+}
+
+.tl-total {
+  text-align: right;
+  color: var(--muted);
+}
+
+.tl-my .tl-team,
+.tl-my .tl-points {
+  color: var(--my);
+}
+
+.tl-opp .tl-team,
+.tl-opp .tl-points {
+  color: var(--opp);
+}
+
+.empty {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.empty[hidden] {
+  display: none;
+}
