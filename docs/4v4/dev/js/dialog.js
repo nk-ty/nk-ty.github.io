@@ -205,3 +205,55 @@ export function durationDialog(currentMinutes, { min, max, presets }) {
     );
   });
 }
+
+// 交代間隔（分）の設定ダイアログ。0 は通知オフ。
+// 戻り値: { minutes } | null（キャンセル）
+export function swapDialog(currentMinutes, { max, presets, warnSec }) {
+  return openDialog((finish) => {
+    const field = numberField('分ごと', currentMinutes, max);
+    const error = el('p', { className: 'dlg-error', hidden: true, role: 'alert' });
+
+    const presetRow = el(
+      'div',
+      { className: 'preset-row' },
+      ...presets.map((m) => {
+        const b = button(m === 0 ? 'オフ' : `${m}分`, 'btn-ghost btn-preset', 'preset', () => {
+          field.input.value = String(m);
+          error.hidden = true;
+        });
+        b.dataset.minutes = String(m);
+        return b;
+      }),
+    );
+
+    const save = () => {
+      const raw = field.input.value;
+      const m = Number(raw);
+      if (raw === '' || !Number.isInteger(m) || m < 0 || m > max) {
+        error.textContent = `交代間隔は 0〜${max} 分の整数で入力してください（0でオフ）`;
+        error.hidden = false;
+        return;
+      }
+      finish({ minutes: m });
+    };
+
+    return el(
+      'div',
+      { className: 'dlg-body' },
+      el('h2', { className: 'dlg-title', textContent: '交代の通知' }),
+      el('p', {
+        className: 'dlg-msg',
+        textContent: `計時中、交代の${warnSec}秒前と交代の時刻に、音・振動・画面表示で知らせます。\n例: 5分ごと → 4:45 と 5:00、9:45 と 10:00 …（試合開始からの時間）`,
+      }),
+      presetRow,
+      el('div', { className: 'dlg-field' }, el('div', { className: 'num-row' }, field.node)),
+      error,
+      el(
+        'div',
+        { className: 'dlg-actions' },
+        button('キャンセル', 'btn-ghost', 'cancel', () => finish(null)),
+        button('保存', 'btn-primary', 'save', save),
+      ),
+    );
+  });
+}

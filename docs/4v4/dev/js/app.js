@@ -4,8 +4,10 @@ import * as history from './history.js';
 import * as settingsLib from './settings.js';
 import * as storage from './storage.js';
 import * as wakeLock from './wakelock.js';
+import * as alerts from './alerts.js';
+import * as notify from './notify.js';
 import { currentEnv, DEV } from './env.js';
-import { confirmDialog, editEventDialog, durationDialog } from './dialog.js';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog } from './dialog.js';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
@@ -14,6 +16,8 @@ const SETTINGS_KEY = 'settings';
 const DURATION_PRESETS = [5, 8, 10, 12, 15, 20];
 const TICK_MS = 250; // 表示更新の間隔。経過時間そのものは時刻差から算出する
 const TOAST_MS = 3500;
+const SWAP_PRESETS = [0, 3, 4, 5, 6, 8, 10];
+const ALERT_HIDE_MS = { warn: 5000, swap: 8000 };
 
 const $ = (id) => document.getElementById(id);
 
@@ -26,6 +30,8 @@ const els = {
   resume: $('btn-resume'),
   reset: $('btn-reset'),
   duration: $('btn-duration'),
+  swap: $('btn-swap'),
+  swapAlert: $('swap-alert'),
   finish: $('btn-finish'),
   wakeNote: $('wake-note'),
   scoreMy: $('score-my'),
@@ -60,6 +66,9 @@ let records = history.sanitize(storage.load(HISTORY_KEY, null));
 let settings = settingsLib.sanitize(storage.load(SETTINGS_KEY, null));
 // 試合時間を過ぎた瞬間にだけ知らせるため、前回の表示が超過だったかを覚えておく
 let overShown = sw.isOvertime(sw.remainingMs(state, Date.now(), settings.matchSec));
+// 交代アラートの判定用: 前回確認した経過時間（計時中でないときは null）
+let lastAlertMs = null;
+let alertTimer = null;
 let timerId = null;
 let toastTimer = null;
 
@@ -111,6 +120,39 @@ function renderClock() {
     navigator.vibrate([200, 100, 200]);
   }
   overShown = over;
+  checkSwapAlerts();
+}
+
+function showSwapAlert(kind) {
+  els.swapAlert.textContent = alerts.alertText(kind);
+  els.swapAlert.dataset.kind = kind;
+  els.swapAlert.hidden = false;
+  clearTimeout(alertTimer);
+  alertTimer = setTimeout(hideSwapAlert, ALERT_HIDE_MS[kind]);
+}
+
+function hideSwapAlert() {
+  clearTimeout(alertTimer);
+  els.swapAlert.hidden = true;
+}
+
+// 計時中だけ、前回の確認から今回までに通過した交代アラートを鳴らす
+function checkSwapAlerts() {
+  if (state.status !== sw.RUNNING) {
+    lastAlertMs = null;
+    return;
+  }
+  const cur = sw.elapsedMs(state, Date.now());
+  if (lastAlertMs !== null) {
+    const hits = alerts.crossedAlerts(lastAlertMs, cur, settings.swapSec);
+    // 同時に複数あっても、最後（いちばん新しい）ものだけ知らせる
+    const last = hits[hits.length - 1];
+    if (last) {
+      notify.play(last.kind);
+      showSwapAlert(last.kind);
+    }
+  }
+  lastAlertMs = cur;
 }
 
 function renderStopwatch() {
@@ -119,6 +161,9 @@ function renderStopwatch() {
   // 計時中は誤タップ防止のため、試合時間の変更を出さない
   els.duration.hidden = state.status === sw.RUNNING;
   els.duration.textContent = `試合時間 ${settingsLib.matchMinutes(settings)}分`;
+  els.swap.hidden = state.status === sw.RUNNING;
+  const swapMin = settingsLib.swapMinutes(settings);
+  els.swap.textContent = swapMin === 0 ? '交代通知 オフ' : `交代 ${swapMin}分ごと`;
   els.start.hidden = state.status !== sw.IDLE;
   els.pause.hidden = state.status !== sw.RUNNING;
   els.resume.hidden = state.status !== sw.PAUSED;
@@ -243,6 +288,7 @@ async function syncRuntime() {
 }
 
 function apply(nextState, nextGame = game) {
+  if (nextState.status !== sw.RUNNING) hideSwapAlert();
   state = nextState;
   game = nextGame;
   persist();
@@ -251,9 +297,17 @@ function apply(nextState, nextGame = game) {
 }
 
 // --- ストップウォッチ ---
-els.start.addEventListener('click', () => apply(sw.start(state, Date.now())));
+// 音はタップ操作の中で許可しておかないと鳴らせない
+els.start.addEventListener('click', () => {
+  notify.unlock();
+  apply(sw.start(state, Date.now()));
+});
 els.pause.addEventListener('click', () => apply(sw.pause(state, Date.now())));
-els.resume.addEventListener('click', () => apply(sw.resume(state, Date.now())));
+els.resume.addEventListener('click', () => {
+  notify.unlock();
+  apply(sw.resume(state, Date.now()));
+});
+els.swapAlert.addEventListener('click', hideSwapAlert);
 
 els.reset.addEventListener('click', async () => {
   const ok = await confirmDialog({
@@ -279,6 +333,21 @@ els.duration.addEventListener('click', async () => {
   if (!storage.save(SETTINGS_KEY, settings)) showNote('試合時間を保存できませんでした。');
   // 設定変更で超過の状態が切り替わっても、振動させない
   overShown = sw.isOvertime(sw.remainingMs(state, Date.now(), settings.matchSec));
+  render();
+});
+
+// --- 交代間隔の変更 ---
+els.swap.addEventListener('click', async () => {
+  const result = await swapDialog(settingsLib.swapMinutes(settings), {
+    max: settingsLib.MAX_SWAP_MINUTES,
+    presets: SWAP_PRESETS,
+    warnSec: alerts.WARN_SEC,
+  });
+  if (!result) return;
+  const next = settingsLib.setSwapMinutes(settings, result.minutes);
+  if (next === settings) return;
+  settings = next;
+  if (!storage.save(SETTINGS_KEY, settings)) showNote('交代間隔を保存できませんでした。');
   render();
 });
 

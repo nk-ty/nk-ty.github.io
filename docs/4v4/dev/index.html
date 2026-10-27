@@ -19,7 +19,10 @@
         <section class="card stopwatch" aria-label="タイマー">
           <p class="status" id="sw-status" aria-live="polite">待機中</p>
           <p class="clock" id="sw-clock" role="timer" aria-live="off">10:00</p>
-          <button type="button" class="btn-duration" id="btn-duration">試合時間 10分</button>
+          <div class="setting-row">
+            <button type="button" class="btn-duration" id="btn-duration">試合時間 10分</button>
+            <button type="button" class="btn-duration" id="btn-swap">交代 5分ごと</button>
+          </div>
 
           <div class="controls">
             <button type="button" class="btn btn-primary" id="btn-start">開始</button>
@@ -81,6 +84,7 @@
     </div>
   </nav>
 
+  <button type="button" class="swap-alert" id="swap-alert" hidden></button>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <script type="module" src="js/app.js"></script>
