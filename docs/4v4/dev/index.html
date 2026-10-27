@@ -63,6 +63,12 @@
           <button type="button" class="btn btn-ghost btn-undo" id="btn-undo" disabled>直前の得点を取り消す</button>
         </section>
 
+        <section class="card lineup" aria-label="出場メンバー">
+          <h2>出場メンバー <span class="hint" id="lineup-count">0/4</span></h2>
+          <div class="chips" id="lineup-chips"></div>
+          <p class="empty" id="lineup-empty">「メンバー」タブで登録すると、ここで選べます</p>
+        </section>
+
         <section class="card timeline" aria-label="得点の履歴">
           <h2>得点の履歴 <span class="hint">行をタップして修正</span></h2>
           <ol class="timeline-list" id="timeline"></ol>
@@ -71,6 +77,15 @@
       </div>
 
       <!-- 履歴（終了した試合） -->
+      <div id="view-members" hidden>
+        <section class="card members" aria-label="メンバー">
+          <h2>メンバー <span class="hint" id="members-count"></span></h2>
+          <ul class="member-list" id="member-list"></ul>
+          <p class="empty" id="members-empty">まだメンバーが登録されていません</p>
+          <button type="button" class="btn btn-primary" id="btn-add-member">メンバーを追加</button>
+        </section>
+      </div>
+
       <div id="view-history" hidden>
         <section class="card history" aria-label="終了した試合">
           <h2>終了した試合</h2>
@@ -84,6 +99,7 @@
   <nav class="tabbar" aria-label="画面の切り替え">
     <div class="tabbar-inner">
       <button type="button" class="tab" id="tab-live" data-view="live" aria-current="page">試合</button>
+      <button type="button" class="tab" id="tab-members" data-view="members">メンバー</button>
       <button type="button" class="tab" id="tab-history" data-view="history">履歴 <span class="tab-count" id="history-count" hidden>0</span></button>
     </div>
   </nav>

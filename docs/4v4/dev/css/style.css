@@ -235,7 +235,9 @@ body {
 }
 
 /* 得点の履歴 */
-.timeline h2 {
+.timeline h2,
+.lineup h2,
+.members h2 {
   margin: 0 0 8px;
   font-size: 0.95rem;
   font-weight: 600;
@@ -329,7 +331,9 @@ body {
 }
 
 /* タイムラインの行（タップで修正） */
-.timeline h2 .hint {
+.timeline h2 .hint,
+.lineup h2 .hint,
+.members h2 .hint {
   margin-left: 6px;
   font-size: 0.75rem;
   font-weight: 400;
@@ -390,6 +394,7 @@ body {
 .match summary {
   display: grid;
   grid-template-columns: 5.2rem 3.4rem 1fr auto;
+  grid-auto-flow: row;
   align-items: center;
   gap: 8px;
   min-height: 60px;
@@ -757,4 +762,90 @@ body {
 
 .btn-notify[hidden] {
   display: none;
+}
+
+/* 出場メンバーの選択 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 48px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--win);
+  background: var(--win);
+  color: #06210f;
+}
+
+.chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* メンバー一覧 */
+.member-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.member-name {
+  font-weight: 700;
+}
+
+.member-edit {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.text-field input {
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.1rem;
+}
+
+.match-members {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.members .btn-primary {
+  width: 100%;
 }

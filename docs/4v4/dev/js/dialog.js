@@ -257,3 +257,59 @@ export function swapDialog(currentMinutes, { max, presets, warnSec }) {
     );
   });
 }
+
+// メンバーの追加・編集ダイアログ。member が null なら追加。
+// validate(name) は問題なければ null、あればエラーメッセージを返す。
+// 戻り値: { action: 'save', name } | { action: 'delete' } | null（キャンセル）
+export function memberDialog(member, { validate, maxLen }) {
+  return openDialog((finish) => {
+    const input = el('input', { type: 'text', value: member ? member.name : '', maxLength: maxLen * 2 });
+    input.setAttribute('aria-label', '名前');
+    input.setAttribute('autocomplete', 'off');
+    const error = el('p', { className: 'dlg-error', hidden: true, role: 'alert' });
+
+    const save = () => {
+      const message = validate(input.value);
+      if (message) {
+        error.textContent = message;
+        error.hidden = false;
+        return;
+      }
+      finish({ action: 'save', name: input.value });
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        save();
+      }
+    });
+
+    let del = null;
+    if (member) {
+      let armed = false;
+      del = button('削除', 'btn-danger-ghost', 'delete', () => {
+        if (!armed) {
+          armed = true;
+          del.textContent = 'もう一度タップで削除';
+          return;
+        }
+        finish({ action: 'delete' });
+      });
+    }
+
+    return el(
+      'div',
+      { className: 'dlg-body' },
+      el('h2', { className: 'dlg-title', textContent: member ? 'メンバーを編集' : 'メンバーを追加' }),
+      el('div', { className: 'dlg-field' }, el('label', { className: 'text-field' }, input)),
+      error,
+      el(
+        'div',
+        { className: 'dlg-actions' },
+        button('キャンセル', 'btn-ghost', 'cancel', () => finish(null)),
+        button('保存', 'btn-primary', 'save', save),
+      ),
+      ...(del ? [del] : []),
+    );
+  });
+}

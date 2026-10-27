@@ -4,15 +4,18 @@ import * as history from './history.js';
 import * as settingsLib from './settings.js';
 import * as storage from './storage.js';
 import * as wakeLock from './wakelock.js';
+import * as membersLib from './members.js';
 import * as alerts from './alerts.js';
 import * as notify from './notify.js';
 import { currentEnv, DEV } from './env.js';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog } from './dialog.js';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog } from './dialog.js';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
 const HISTORY_KEY = 'history';
 const SETTINGS_KEY = 'settings';
+const MEMBERS_KEY = 'members';
+const LINEUP_KEY = 'lineup';
 const DURATION_PRESETS = [5, 8, 10, 12, 15, 20];
 const TICK_MS = 250; // 表示更新の間隔。経過時間そのものは時刻差から算出する
 const TOAST_MS = 3500;
@@ -46,6 +49,14 @@ const els = {
   timelineEmpty: $('timeline-empty'),
   viewLive: $('view-live'),
   viewHistory: $('view-history'),
+  viewMembers: $('view-members'),
+  lineupChips: $('lineup-chips'),
+  lineupCount: $('lineup-count'),
+  lineupEmpty: $('lineup-empty'),
+  memberList: $('member-list'),
+  membersEmpty: $('members-empty'),
+  membersCount: $('members-count'),
+  addMember: $('btn-add-member'),
   tabs: document.querySelectorAll('.tab'),
   historyList: $('history-list'),
   historyEmpty: $('history-empty'),
@@ -67,6 +78,9 @@ let state = sw.sanitize(storage.load(SW_KEY, null));
 let game = match.sanitize(storage.load(MATCH_KEY, null));
 let records = history.sanitize(storage.load(HISTORY_KEY, null));
 let settings = settingsLib.sanitize(storage.load(SETTINGS_KEY, null));
+let members = membersLib.sanitize(storage.load(MEMBERS_KEY, null));
+// 出場メンバーの選択。試合のリセット・終了では消さず、次の試合に引き継ぐ
+let lineup = membersLib.sanitizeLineup(storage.load(LINEUP_KEY, null), members);
 // 試合時間を過ぎた瞬間にだけ知らせるため、前回の表示が超過だったかを覚えておく
 let overShown = sw.isOvertime(sw.remainingMs(state, Date.now(), settings.matchSec));
 // 交代アラートの判定用: 前回確認した経過時間（計時中でないときは null）
@@ -210,6 +224,49 @@ function renderScore() {
   els.timelineEmpty.hidden = items.length > 0;
 }
 
+function renderLineup() {
+  els.lineupCount.textContent = `${lineup.length}/${membersLib.MAX_LINEUP}`;
+  els.lineupEmpty.hidden = members.length > 0;
+  const full = lineup.length >= membersLib.MAX_LINEUP;
+  els.lineupChips.replaceChildren(
+    ...members.map((m) => {
+      const on = lineup.includes(m.id);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.dataset.id = m.id;
+      b.setAttribute('aria-pressed', String(on));
+      // 4人選択済みのときは、未選択のメンバーを押せなくする
+      b.disabled = full && !on;
+      b.textContent = m.name;
+      return b;
+    }),
+  );
+}
+
+function renderMembers() {
+  els.membersEmpty.hidden = members.length > 0;
+  els.membersCount.textContent = members.length > 0 ? `${members.length}人` : '';
+  els.memberList.replaceChildren(
+    ...members.map((m) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'member-row';
+      b.dataset.id = m.id;
+      b.setAttribute('aria-label', `${m.name}。タップして編集`);
+      b.append(span('member-name', m.name), span('member-edit', '編集'));
+      li.append(b);
+      return li;
+    }),
+  );
+}
+
+function saveMembers() {
+  const ok = storage.save(MEMBERS_KEY, members) && storage.save(LINEUP_KEY, lineup);
+  if (!ok) showNote('メンバーを保存できませんでした。ブラウザの設定を確認してください。');
+}
+
 function buildMatchItem(rec) {
   const s = history.summarize(rec);
   const li = document.createElement('li');
@@ -223,6 +280,9 @@ function buildMatchItem(rec) {
     span('match-score', `${s.my} - ${s.opp}`),
     span('match-time', sw.formatClock(rec.durationSec * 1000)),
   );
+  if (rec.members.length > 0) {
+    summary.append(span('match-members', rec.members.map((m) => m.name).join('・')));
+  }
 
   const list = document.createElement('ol');
   list.className = 'match-events';
@@ -257,16 +317,19 @@ function renderHistory() {
 function render() {
   renderStopwatch();
   renderScore();
+  renderLineup();
 }
 
 function setView(name) {
   els.viewLive.hidden = name !== 'live';
   els.viewHistory.hidden = name !== 'history';
+  els.viewMembers.hidden = name !== 'members';
   for (const tab of els.tabs) {
     if (tab.dataset.view === name) tab.setAttribute('aria-current', 'page');
     else tab.removeAttribute('aria-current');
   }
   if (name === 'history') renderHistory();
+  if (name === 'members') renderMembers();
   window.scrollTo(0, 0);
 }
 
@@ -366,6 +429,8 @@ els.finish.addEventListener('click', async () => {
   const events = game.events;
   const t = match.totals(game);
   const label = RESULT_LABEL[match.result(t)];
+  const lineupMembers = membersLib.snapshot(members, lineup);
+  const lineupNames = lineupMembers.map((m) => m.name);
   const extra = durationSec - settings.matchSec;
   const timeText =
     sw.formatClock(durationSec * 1000) + (extra > 0 ? `（延長 +${sw.formatClock(extra * 1000)}）` : '');
@@ -375,7 +440,8 @@ els.finish.addEventListener('click', async () => {
     message:
       `最終スコア　自チーム ${t.my} - ${t.opp} 相手（${label}）\n` +
       `試合時間　${timeText}\n` +
-      `得点　${events.length}件\n\n` +
+      `得点　${events.length}件\n` +
+      `メンバー　${lineupNames.length > 0 ? lineupNames.join('・') : '未選択'}\n\n` +
       '履歴に保存して、新しい試合を始められる状態にします。',
     okLabel: '終了して保存',
   });
@@ -386,6 +452,7 @@ els.finish.addEventListener('click', async () => {
     finishedAtMs: nowMs,
     durationSec,
     events,
+    members: lineupMembers,
   });
   const nextRecords = history.addRecord(records, record);
   // 履歴に保存できなかったときは、進行中の試合を消さない
@@ -450,6 +517,49 @@ els.notifyBtn.addEventListener('click', async () => {
   } else if (result === 'denied') {
     showNote('通知がブロックされています。ブラウザ（端末）の設定で、このサイトの通知を許可してください。');
   }
+});
+
+// --- メンバー ---
+els.lineupChips.addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  lineup = membersLib.toggleLineup(lineup, chip.dataset.id);
+  saveMembers();
+  renderLineup();
+  if (navigator.vibrate) navigator.vibrate(10);
+});
+
+els.addMember.addEventListener('click', async () => {
+  const result = await memberDialog(null, {
+    validate: (name) => (members.length >= membersLib.MAX_MEMBERS ? `登録は${membersLib.MAX_MEMBERS}人までです` : membersLib.validateName(members, name)),
+    maxLen: membersLib.MAX_NAME_LEN,
+  });
+  if (!result) return;
+  members = membersLib.addMember(members, result.name);
+  saveMembers();
+  renderMembers();
+  renderLineup();
+});
+
+els.memberList.addEventListener('click', async (e) => {
+  const row = e.target.closest('.member-row');
+  if (!row) return;
+  const member = members.find((m) => m.id === row.dataset.id);
+  if (!member) return;
+  const result = await memberDialog(member, {
+    validate: (name) => membersLib.validateName(members, name, member.id),
+    maxLen: membersLib.MAX_NAME_LEN,
+  });
+  if (!result) return;
+  if (result.action === 'delete') {
+    members = membersLib.removeMember(members, member.id);
+    lineup = membersLib.sanitizeLineup(lineup, members);
+  } else {
+    members = membersLib.renameMember(members, member.id, result.name);
+  }
+  saveMembers();
+  renderMembers();
+  renderLineup();
 });
 
 // --- 画面切り替え ---

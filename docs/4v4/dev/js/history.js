@@ -3,12 +3,14 @@
 
 import * as match from './match.js';
 
-export function createRecord({ id, finishedAtMs, durationSec, events }) {
+export function createRecord({ id, finishedAtMs, durationSec, events, members = [] }) {
   return {
     id: String(id),
     finishedAtMs,
     durationSec: Math.max(0, Math.floor(durationSec)),
     events: events.map((e) => ({ ...e })),
+    // その試合に出たメンバーの名前（登録の変更に影響されないよう写しを持つ）
+    members: members.map((m) => ({ id: m.id, name: m.name })),
   };
 }
 
@@ -47,6 +49,13 @@ export function formatDateTime(ms) {
   return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+function memberList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m) => m && typeof m.id === 'string' && typeof m.name === 'string' && m.name !== '')
+    .map((m) => ({ id: m.id, name: m.name }));
+}
+
 // 保存データが壊れていても落ちないよう、読み込んだ値を検証して正規化する。
 // 壊れた1件だけを除外し、他の試合は残す。
 export function sanitize(raw) {
@@ -65,6 +74,7 @@ export function sanitize(raw) {
       finishedAtMs: r.finishedAtMs,
       durationSec: Math.floor(r.durationSec),
       events: match.sanitize({ events: r.events }).events,
+      members: memberList(r.members),
     });
   }
   return out;
