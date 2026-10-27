@@ -1,3 +1,0 @@
-env: dev
-commit: 9163ef0
-published: 2026-10-27T23:24:36Z
