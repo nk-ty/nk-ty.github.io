@@ -2,7 +2,7 @@
 // 試合記録は得点イベントを保存し、スコア・勝敗はイベントから算出する。
 // ただし手入力の試合や、後からスコアを直した試合は manual: { my, opp } を持ち、そちらを優先する。
 
-import * as match from './match.js';
+import * as match from './match.js?v=bc4b2ea';
 
 const teamRef = (t) => (t && typeof t.id === 'string' && typeof t.name === 'string' && t.name !== '' ? { id: t.id, name: t.name } : null);
 const memberRefs = (list) => (Array.isArray(list) ? list : []).map((m) => ({ id: m.id, name: m.name }));
