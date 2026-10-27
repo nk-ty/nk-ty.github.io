@@ -17,6 +17,8 @@ const DURATION_PRESETS = [5, 8, 10, 12, 15, 20];
 const TICK_MS = 250; // 表示更新の間隔。経過時間そのものは時刻差から算出する
 const TOAST_MS = 3500;
 const SWAP_PRESETS = [0, 3, 4, 5, 6, 8, 10];
+// 裏に回ったタブはタイマーが約1秒間隔に間引かれるため、少し余裕を持たせる
+const BG_STALE_MS = 5000;
 const ALERT_HIDE_MS = { warn: 5000, swap: 8000 };
 
 const $ = (id) => document.getElementById(id);
@@ -32,6 +34,7 @@ const els = {
   duration: $('btn-duration'),
   swap: $('btn-swap'),
   swapAlert: $('swap-alert'),
+  notifyBtn: $('btn-notify'),
   finish: $('btn-finish'),
   wakeNote: $('wake-note'),
   scoreMy: $('score-my'),
@@ -144,12 +147,16 @@ function checkSwapAlerts() {
   }
   const cur = sw.elapsedMs(state, Date.now());
   if (lastAlertMs !== null) {
-    const hits = alerts.crossedAlerts(lastAlertMs, cur, settings.swapSec);
+    const hits = alerts.crossedAlerts(lastAlertMs, cur, settings.swapSec, { staleMs: BG_STALE_MS });
     // 同時に複数あっても、最後（いちばん新しい）ものだけ知らせる
     const last = hits[hits.length - 1];
     if (last) {
       notify.play(last.kind);
       showSwapAlert(last.kind);
+      // 別アプリを見ているときなどは、端末の通知でも知らせる
+      if (document.hidden) {
+        notify.showSystem(alerts.alertText(last.kind), `試合 ${sw.formatClock(cur)}`, last.kind);
+      }
     }
   }
   lastAlertMs = cur;
@@ -429,6 +436,22 @@ els.timeline.addEventListener('click', async (e) => {
   }
 });
 
+// --- 端末の通知 ---
+function renderNotifyButton() {
+  els.notifyBtn.hidden = notify.systemPermission() !== 'default';
+}
+
+els.notifyBtn.addEventListener('click', async () => {
+  const result = await notify.requestSystemPermission();
+  renderNotifyButton();
+  if (result === 'granted') {
+    notify.showSystem('通知をオンにしました', '交代の15秒前と交代の時刻に知らせます', 'warn');
+    showToast('端末の通知をオンにしました');
+  } else if (result === 'denied') {
+    showNote('通知がブロックされています。ブラウザ（端末）の設定で、このサイトの通知を許可してください。');
+  }
+});
+
 // --- 画面切り替え ---
 for (const tab of els.tabs) {
   tab.addEventListener('click', () => setView(tab.dataset.view));
@@ -447,8 +470,18 @@ document.addEventListener('visibilitychange', () => {
 if (currentEnv() === DEV) {
   $('env-badge').hidden = false;
   document.title = '[DEV] ' + document.title;
+  $('manifest-link').href = 'manifest-dev.webmanifest';
 }
 
 render();
 renderHistory();
 syncRuntime();
+
+// 端末の通知の準備（Service Worker 登録・許可ボタン）
+notify.registerWorker();
+renderNotifyButton();
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const isStandalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+if (!notify.systemSupported() && isIOS && !isStandalone) {
+  showNote('iPhoneで端末の通知を使うには、共有メニューの「ホーム画面に追加」から開いてください。');
+}

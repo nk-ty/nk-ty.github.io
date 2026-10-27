@@ -55,3 +55,53 @@ export function play(kind) {
     // 無視
   }
 }
+
+// --- 端末の通知（通知センター・バナー） ---
+// Service Worker 経由で出す（Android の Chrome は new Notification() が使えないため）。
+// 画面ロックやブラウザが裏にあるとき、タイマー自体が止まる/遅れることがあり、その場合は出ない（ベストエフォート）。
+
+export function systemSupported() {
+  return typeof Notification !== 'undefined' && 'serviceWorker' in navigator;
+}
+
+export function systemPermission() {
+  return systemSupported() ? Notification.permission : 'unsupported';
+}
+
+export async function registerWorker() {
+  if (!systemSupported()) return null;
+  try {
+    return await navigator.serviceWorker.register('./sw.js');
+  } catch {
+    return null;
+  }
+}
+
+// タップ操作の中で呼ぶ。結果: 'granted' | 'denied' | 'default' | 'unsupported'
+export async function requestSystemPermission() {
+  if (!systemSupported()) return 'unsupported';
+  try {
+    return await Notification.requestPermission();
+  } catch {
+    return Notification.permission;
+  }
+}
+
+export async function showSystem(title, body, kind) {
+  if (systemPermission() !== 'granted') return false;
+  try {
+    const reg = (await navigator.serviceWorker.getRegistration()) ?? (await registerWorker());
+    if (!reg) return false;
+    await reg.showNotification(title, {
+      body,
+      tag: 'swap-alert',
+      renotify: true,
+      vibrate: VIBRATION[kind] ?? VIBRATION.warn,
+      icon: 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}

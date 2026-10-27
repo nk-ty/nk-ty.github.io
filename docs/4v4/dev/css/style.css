@@ -750,3 +750,11 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .swap-alert[data-kind="swap"] { animation: none; }
 }
+
+.btn-notify {
+  margin-top: 12px;
+}
+
+.btn-notify[hidden] {
+  display: none;
+}
