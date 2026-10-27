@@ -1,6 +1,6 @@
 // 成績の集計（純粋ロジック）。履歴の試合から、通算とチーム別の勝/分/負・得点/失点を出す。
 
-import { summarize } from './history.js?v=9555132';
+import { summarize } from './history.js?v=d20688e';
 
 export const NO_TEAM = '__none__'; // 自分側にチームを付けていない試合
 

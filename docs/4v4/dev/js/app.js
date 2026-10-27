@@ -1,17 +1,17 @@
-import * as sw from './stopwatch.js?v=9555132';
-import * as match from './match.js?v=9555132';
-import * as history from './history.js?v=9555132';
-import * as settingsLib from './settings.js?v=9555132';
-import * as storage from './storage.js?v=9555132';
-import * as wakeLock from './wakelock.js?v=9555132';
-import * as membersLib from './members.js?v=9555132';
-import * as teamsLib from './teams.js?v=9555132';
-import * as setupLib from './setup.js?v=9555132';
-import * as stats from './stats.js?v=9555132';
-import * as alerts from './alerts.js?v=9555132';
-import * as notify from './notify.js?v=9555132';
-import { currentEnv, DEV } from './env.js?v=9555132';
-import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=9555132';
+import * as sw from './stopwatch.js?v=d20688e';
+import * as match from './match.js?v=d20688e';
+import * as history from './history.js?v=d20688e';
+import * as settingsLib from './settings.js?v=d20688e';
+import * as storage from './storage.js?v=d20688e';
+import * as wakeLock from './wakelock.js?v=d20688e';
+import * as membersLib from './members.js?v=d20688e';
+import * as teamsLib from './teams.js?v=d20688e';
+import * as setupLib from './setup.js?v=d20688e';
+import * as stats from './stats.js?v=d20688e';
+import * as alerts from './alerts.js?v=d20688e';
+import * as notify from './notify.js?v=d20688e';
+import { currentEnv, DEV } from './env.js?v=d20688e';
+import { confirmDialog, editEventDialog, durationDialog, swapDialog, memberDialog, recordDialog, teamDialog } from './dialog.js?v=d20688e';
 
 const SW_KEY = 'stopwatch';
 const MATCH_KEY = 'match';
@@ -76,6 +76,7 @@ const els = {
   statsTeams: $('stats-teams'),
   statsRows: $('stats-rows'),
   filterClear: $('filter-clear'),
+  clearHistory: $('btn-clear-history'),
   tabs: document.querySelectorAll('.tab'),
   historyList: $('history-list'),
   historyEmpty: $('history-empty'),
@@ -438,13 +439,19 @@ function pct(rate) {
 function renderStats() {
   els.statsCard.hidden = records.length === 0;
   if (records.length === 0) return;
-  const o = stats.overall(records);
-  els.statsOverall.textContent =
-    `通算 ${o.played}試合　${o.win}勝 ${o.draw}分 ${o.loss}敗（勝率 ${pct(stats.winRate(o))}）\n` +
-    `得点 ${o.pf}　失点 ${o.pa}`;
   const rows = stats.byTeam(records);
+  const usesTeams = !rows.every((r) => r.key === stats.NO_TEAM);
+  const line = (label, o) =>
+    `${label}　${o.played}試合 ${o.win}勝 ${o.draw}分 ${o.loss}敗（勝率 ${pct(stats.winRate(o))}）\n` +
+    `得点 ${o.pf}　失点 ${o.pa}`;
+  const selected = rows.find((r) => r.key === historyFilter);
+  // どのチームの成績かが分かるように、チーム名を付けて出す。
+  // チームを使っているときは全体の勝敗に意味がないため、試合数だけを出す
+  if (selected) els.statsOverall.textContent = line(`${selected.name} の成績`, selected);
+  else if (usesTeams) els.statsOverall.textContent = `全 ${records.length}試合`;
+  else els.statsOverall.textContent = line('自チームの通算', stats.overall(records));
   // チームを使っていないときは、チーム別の表を出さない
-  els.statsTeams.hidden = rows.every((r) => r.key === stats.NO_TEAM);
+  els.statsTeams.hidden = !usesTeams;
   els.statsRows.replaceChildren(
     ...rows.map((r) => {
       const b = document.createElement('button');
@@ -490,6 +497,7 @@ function renderHistory() {
   els.historyEmpty.hidden = list.length > 0;
   // タブの件数は絞り込みに関係なく全試合数
   els.historyCount.hidden = records.length === 0;
+  els.clearHistory.hidden = records.length === 0;
   els.historyCount.textContent = String(records.length);
 }
 
@@ -795,6 +803,21 @@ els.statsRows.addEventListener('click', (e) => {
   if (!row) return;
   historyFilter = historyFilter === row.dataset.key ? null : row.dataset.key;
   renderHistory();
+});
+
+// 試合データ（履歴）の一括削除。チーム・メンバーの登録と進行中の試合は残す
+els.clearHistory.addEventListener('click', async () => {
+  const ok = await confirmDialog({
+    title: '試合データをすべて削除しますか？',
+    message:
+      `終了した試合 ${records.length}件をすべて削除します。元に戻せません。\n` +
+      'チーム・メンバーの登録と、進行中の試合は残ります。',
+    okLabel: `${records.length}件を削除`,
+    danger: true,
+  });
+  if (!ok) return;
+  historyFilter = null;
+  saveRecords([], '試合データをすべて削除しました');
 });
 
 els.filterClear.addEventListener('click', () => {

@@ -2,7 +2,7 @@
 // ブラウザの制約: 音はユーザー操作後でないと鳴らせないため、「開始/再開」タップで unlock() する。
 // iOS Safari は振動に非対応（音とバナーで知らせる）。
 
-import { SWAP } from './alerts.js?v=9555132';
+import { SWAP } from './alerts.js?v=d20688e';
 
 const VIBRATION = {
   warn: [300],
